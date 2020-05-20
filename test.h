@@ -7,7 +7,7 @@
 #define G 1
 #define B 2
 
-#include "Lib/ascii_art.h"
+//#include "Lib/ascii_art.h"
 
 #include <stdio.h>
 #include <unistd.h>

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
 project( shrek )
 include_directories( Lib )
-add_executable( shrek test.c Lib/ascii_art.c )
+add_executable( shrek test.c )
 target_link_libraries( shrek ${OpenCV_LIBS} -I ./include -L./lib -lavformat -lavcodec -lswscale -lavutil -lswresample -lz -lm -lpthread)
