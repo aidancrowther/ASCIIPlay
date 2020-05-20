@@ -158,7 +158,7 @@ void openStream(struct vStreamArgs* args){
 }
 
 void renderFrame(uint8_t *img, int width, int height) {
-/*	ascii_render sRender;
+	ascii_render sRender;
 
 	unsigned char *zText;
 	unsigned int nBytes;
@@ -181,7 +181,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 
 	// Free allocated memory
 	free(zText);
-*/
+
 	return;
 }
 
