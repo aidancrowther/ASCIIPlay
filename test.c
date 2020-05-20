@@ -7,9 +7,8 @@
 
 #include "test.h"
 
-//comment
-
 struct videoStream vStream;
+WINDOW *vWindow;
 
 uint8_t* grayscale(AVFrame *pFrame, int width, int height){
 	uint8_t *img = (uint8_t*) malloc(width*height * sizeof(uint8_t*));
@@ -48,9 +47,6 @@ void openStream(struct vStreamArgs* args){
 	//Get stream info
 	if(avformat_find_stream_info(pFormatCtx, NULL) < 0)
   		pthread_exit(2); // Couldn't find stream information
-
-	// Dump information about file onto standard error
-	av_dump_format(pFormatCtx, 0, filename, 0);
 	
 	// Find first video stream
 	int i = 0;
@@ -125,10 +121,9 @@ void openStream(struct vStreamArgs* args){
 					pFrame->linesize, 0, pCodecCtx->height,
 					pFrameRGB->data, pFrameRGB->linesize);
 
-				// Render frame
-				//RenderFrame(pFrameRGB, pCodecCtx->width, pCodecCtx->height);
-
+				// Wait until there is room in the frame buffer
 				while(vStream.bufferLength >= MAX_BUFFER);
+				// Write the new frame to the buffer
 				writeBuffer(videoBuffer, pFrameRGB, 0);
 
 			}
@@ -158,12 +153,12 @@ void openStream(struct vStreamArgs* args){
 }
 
 void renderFrame(uint8_t *img, int width, int height) {
-	ascii_render sRender;
+	//ascii_render sRender;
 
 	unsigned char *zText;
 	unsigned int nBytes;
 	
-	AsciiArtInit(&sRender);
+	/*AsciiArtInit(&sRender);
 
 	// Allocate space for ascii frame
 	nBytes = AsciiArtTextBufSize(&sRender, width, height);
@@ -171,56 +166,84 @@ void renderFrame(uint8_t *img, int width, int height) {
 
 	// Call ASCII renderer
 	AsciiArtRender(&sRender, img, &width, &height, zText, 1);
+
+	// Generate subtitles
 	generateSubs(&zText);
 
-	//Clear the screen to render the frame
-	clrscr();
+	width = width/CHAR_X;
+	height = height/CHAR_Y;
+
+	int newBytes = nBytes-height;
+	unsigned char stripped[newBytes];
+	
+	// Strip newline characters from the output stream
+	int count = 0;
+	for (int i = 0; i<nBytes; i++){
+		if (*(zText+i) != '\n'){
+			stripped[count++] = *(zText+i);
+		}
+	}
 
 	// Print ASCII to screen
-	printf("%s", zText);
+	for (int i=0; i<newBytes; i++){
+		mvaddch(i/width, i%width, stripped[i]);
+	}
+	refresh();
 
 	// Free allocated memory
-	free(zText);
+	free(zText);*/
 
 	return;
 }
 
+// Write new frame data to the tail of the buffer queue
 void writeBuffer(struct vBuffer *buffer, AVFrame *frame, uint8_t last){
 	struct vBuffer *newBuffer;
 
+	// Wait for the semaphore
 	while (vStream.semaphore != 0);
 	vStream.semaphore = 1;
 
+	// Find the ned of the buffer
 	while (buffer->next != NULL) buffer = buffer->next;
+	// Allocate the buffer
 	newBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*)+sizeof(uint8_t*) * vStream.width*vStream.height);
 	
+	// Handle the NULL head frame buffer
 	if (frame != NULL){
+		// Convert frame data to a grayscale represenation and store it
 		uint8_t *img = grayscale(frame, vStream.width, vStream.height);
 		newBuffer->frame = img;
 	}
+
+	// Update frame buffer
 	buffer->next = newBuffer;
 	newBuffer->next = NULL;
 	newBuffer->streamEnd = last;
-
 	vStream.bufferLength++;
+
 	vStream.semaphore = 0;
 }
 
+// Return frame buffer at the head of our queue
 struct vBuffer* readBuffer(struct vBuffer *buffer){
 	struct vBuffer *prevBuffer;
 
+	// Wait for the semaphore so we don't cause any issues
 	while (vStream.semaphore != 0);
 	vStream.semaphore = 1;
 
+	// Skip the head NULL buffer
 	while (buffer->next == NULL){
+		// Store/Free the old buffer and get the new one
 		prevBuffer = buffer;
 		buffer = buffer->next;
+		free(prevBuffer->frame);
 		free(prevBuffer);
 	}
 
-	prevBuffer = buffer;
+	// Update buffer and queue
 	buffer = buffer->next;
-
 	vStream.bufferLength--;
 	vStream.semaphore = 0;
 
@@ -228,27 +251,43 @@ struct vBuffer* readBuffer(struct vBuffer *buffer){
 
 }
 
+// Run continuously in the background rendering frames when needed
 void *renderingEngine(struct vBuffer *buffer){
 
-	struct timespec timing;
+	// Timing variables
+	struct timeval start, curr, diff;
+	gettimeofday(&start, 0x0);
 
+	// Run until we hit the streamEnd frame
 	while(1){
 
+		// Thread may be ready before the frames are, so wait for frames
 		while(vStream.bufferLength <= 0);
 
-		timing.tv_nsec = (1/vStream.fps)*1000000000;
+		// Update time tracking
+		gettimeofday(&curr, 0x0);
+		timeval_subtract(&diff, &curr, &start);
 
-		nanosleep(&timing, (struct timespec*) NULL);
-
-		buffer = readBuffer(buffer);
-		if(buffer->streamEnd) break;
-		renderFrame(buffer->frame, vStream.width, vStream.height);
+		// If enough time has passed between the last frame and this one render it
+		if (diff.tv_usec >= (1/vStream.fps)*1000000){
+			// Update our timing variable
+			gettimeofday(&start, 0x0);
+			// Pull the new frame data from the buffer
+			buffer = readBuffer(buffer);
+			// Exit on streamEnd
+			if(buffer->streamEnd) break;
+			// Pass frame data to renderer
+			renderFrame(buffer->frame, vStream.width, vStream.height);
+		}
 
 	}
+
+	free(buffer);
 
 	pthread_exit(0);
 }
 
+// Superimpose subtitles over the generated ASCII
 void generateSubs(char **frame){
 
 	char tmp[10] = "ooga booga";
@@ -258,7 +297,35 @@ void generateSubs(char **frame){
 	}
 }
 
+// Compare two timeval structs to determine difference
+int timeval_subtract (result, x, y)
+     struct timeval *result, *x, *y;
+{
+  /* Perform the carry for the later subtraction by updating y. */
+  if (x->tv_usec < y->tv_usec) {
+    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+    y->tv_usec -= 1000000 * nsec;
+    y->tv_sec += nsec;
+  }
+  if (x->tv_usec - y->tv_usec > 1000000) {
+    int nsec = (y->tv_usec - x->tv_usec) / 1000000;
+    y->tv_usec += 1000000 * nsec;
+    y->tv_sec -= nsec;
+  }
+
+  result->tv_sec = x->tv_sec - y->tv_sec;
+  result->tv_usec = x->tv_usec - y->tv_usec;
+
+  /* Return 1 if result is negative. */
+  return x->tv_sec < y->tv_sec;
+}
+
+// Spawn all neccessary threads and manage them
 int main(int argc, char *argv[]){
+
+	//initscr();
+	//noecho();
+	//curs_set(FALSE);
 
 	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
 	videoBuffer->frame = NULL;
@@ -272,8 +339,6 @@ int main(int argc, char *argv[]){
 
 	av_register_all();
 
-	clrscr();
-
 	struct vStreamArgs *vArgs = (struct vStreamArgs*) malloc(sizeof(struct vStreamArgs*));
 
 	vArgs->file = "shrek.mp4";
@@ -284,8 +349,9 @@ int main(int argc, char *argv[]){
 	pthread_join(threads[0], NULL);
 	pthread_join(threads[1], NULL);
 
-	free(videoBuffer);
 	free(vArgs);
+
+	//endwin();
 
 	return 0;
 
