@@ -7,7 +7,14 @@
 #define G 1
 #define B 2
 
-//#include "Lib/ascii_art.h"
+
+//If you have the janky library that Aidan won't share change to a 1
+#ifndef __IS_AIDAN
+	#define __IS_AIDAN 0
+#endif
+#if __IS_AIDAN==1
+	#include "Lib/ascii_art.h"
+#endif
 
 #include <stdio.h>
 #include <unistd.h>
