@@ -2,30 +2,20 @@
 #define NUM_THREADS 3
 #define NUM_CHANNELS 3
 #define CHAR_X 8
-#define CHAR_Y 16
+#define CHAR_Y 8
 #define R 0
 #define G 1
 #define B 2
 
-
-//If you have the janky library that Aidan won't share change to a 1
-#ifndef __IS_AIDAN
-	#define __IS_AIDAN 0
-#endif
-#if __IS_AIDAN==1
-	#include "Lib/ascii_art.h"
-#endif
-
+#include "Lib/ascii_art.h"
 #include <stdio.h>
 #include <unistd.h>
-
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
-
 #include <pthread.h>
-
-#include <time.h>
+#include <sys/time.h>
+#include <ncurses.h>
 
 struct videoStream {
 	double fps;
@@ -41,7 +31,7 @@ struct videoStream {
 struct vBuffer {
 	uint8_t *frame;
 	struct vBuffer *next;
-	uint8_t streamEnd;
+	double time;
 };
 
 struct vStreamArgs {
