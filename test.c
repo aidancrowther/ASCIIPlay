@@ -8,6 +8,8 @@
 #include "test.h"
 
 struct videoStream vStream;
+FILE* subFile;
+regex_t matchTime;
 
 uint8_t* grayscale(AVFrame *pFrame, int width, int height){
 	uint8_t *img = (uint8_t*) malloc(width*height * sizeof(uint8_t*));
@@ -167,8 +169,14 @@ void renderFrame(uint8_t *img, int width, int height) {
 	// Generate subtitles
 	generateSubs(&zText);
 
+	int x = 0, y = 0;
+	getmaxyx(stdscr, y, x);
+
 	width = width/CHAR_X;
 	height = height/CHAR_Y;
+
+	x = (x-width)/2;
+	y = (y-height)/2+(y-height)%2;
 
 	int newBytes = nBytes-height;
 	unsigned char stripped[newBytes];
@@ -183,7 +191,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 
 	// Print ASCII to screen
 	for (int i=0; i<newBytes; i++){
-		mvaddch(i/width, i%width, stripped[i]);
+		mvaddch(y+i/width, x+i%width, stripped[i]);
 	}
 	refresh();
 
@@ -229,8 +237,7 @@ struct vBuffer** readBuffer(struct vBuffer **buffer){
 	vStream.semaphore = 1;
 
 	// Update buffer and queue
-	//prevBuffer = &buffer;
-	if((*buffer)->time >= 2.0) sleep(5);
+	//if((*buffer)->time >= 2.0) sleep(5);
 	nextBuffer = (*buffer)->next;
 	free((*buffer)->frame);
 	free(*buffer);
@@ -241,8 +248,62 @@ struct vBuffer** readBuffer(struct vBuffer **buffer){
 
 }
 
+double decodeTime(char* time, int last){
+
+	int offset = 0;
+	if (last) offset = 17;
+
+	double factor[9] = {36000, 3600, 600, 60, 10, 1, 0.1, 0.01, 0.001};
+	int index = 0;
+	double result = 0.0;
+	
+	for(int i=offset; i<=offset+TIME_CODE_LENGTH; i++){
+		if(*(time+i) == ':' || *(time+i) == ',') continue;
+		result += (((int) *(time+i)) - '0') * factor[index++];
+	}
+
+	return result;
+
+}
+
+// Load array of subtitle time codes
+void loadSubs(){
+
+	char buffer[MAX_CHAR];
+
+	subFile = fopen(vStream.subFile, "r");
+
+	if (!subFile) return;
+
+	int lines = 0;
+
+	while(fgets(buffer, sizeof(buffer), subFile) != NULL){
+		if(!regexec(&matchTime, buffer, 0, NULL, 0)) lines++;
+	}
+
+	rewind(subFile);
+
+	vStream.subTimes = malloc(sizeof(double) * lines * 3);
+	int count = 0;
+	lines = 0;
+
+	while(fgets(buffer, sizeof(buffer), subFile) != NULL){
+		if(!regexec(&matchTime, buffer, 0, NULL, 0)){
+			*(vStream.subTimes+(count++)) = decodeTime(buffer, 0);
+			*(vStream.subTimes+(count++)) = decodeTime(buffer, 1);
+			*(vStream.subTimes+(count++)) = lines+1;
+		}
+		lines++;
+	}
+
+	rewind(subFile);
+
+}
+
 // Run continuously in the background rendering frames when needed
 void *renderingEngine(struct vBuffer *buffer){
+
+	loadSubs();
 
 	// Timing variables
 	struct timeval start, curr, diff;
@@ -265,6 +326,7 @@ void *renderingEngine(struct vBuffer *buffer){
 			// Pull the new frame data from the buffer
 			while(buffer->next == NULL);
 			buffer = readBuffer(&buffer);
+			vStream.time = buffer->time;
 			// Pass frame data to renderer
 			renderFrame(buffer->frame, vStream.width, vStream.height);
 
@@ -273,17 +335,98 @@ void *renderingEngine(struct vBuffer *buffer){
 	}
 
 	free(buffer);
+	fclose(subFile);
 	pthread_exit(0);
+}
+
+void prepSubs(char *str){
+
+	char newString[MAX_CHAR];
+	int iterator = 0;
+
+	for(int i=0; i<MAX_CHAR; i++){
+		if (*(str+i) != '\n' && *(str+i) != '"') newString[iterator++] = *(str+i);
+	}
+
+	int length = strlen(newString);
+	int offset = (MAX_CHAR-length)/2;
+	iterator = 0;
+
+	for (int i=0; i<MAX_CHAR; i++){
+		*(str+i) = ' ';
+		if (i >= offset-1 && i < offset+length-2) *(str+i) = newString[iterator++];
+	}
+
 }
 
 // Superimpose subtitles over the generated ASCII
 void generateSubs(char **frame){
 
-	char tmp[10] = "ooga booga";
+	char buffer[MAX_CHAR];
+	double start = *(vStream.subTimes+vStream.subPos*3+0);
+	double end = *(vStream.subTimes+vStream.subPos*3+1);
+	int currLine = (int) *(vStream.subTimes+vStream.subPos*3+2);
+	int reading = 0;
 
-	for (int i=0; i<30; i++){
-		//*(*(frame)+i) = '0';
+	// Initialize the subtitles
+	if (vStream.subPos == 0){
+		if(vStream.fpPos == 0){
+			while(fgets(buffer, sizeof(buffer), subFile) != NULL){
+				if (vStream.fpPos == currLine){
+					prepSubs(buffer);
+					strcpy(vStream.subs[0], buffer);
+					reading = 1;
+				} else if (reading){
+					prepSubs(buffer);
+					strcpy(vStream.subs[1], buffer);
+					vStream.fpPos++;
+					reading = 0;
+					break;
+				}
+				vStream.fpPos++;
+			}
+		}
 	}
+
+	if (vStream.time >= start && vStream.time < end){
+
+		int width = vStream.width/CHAR_X;
+		int height = vStream.height/CHAR_Y;
+
+		int tBox_X = MAX_CHAR+2, tBox_Y = NUM_ROWS+2;
+		int bLoc_X = (width/2) - (tBox_X/2), bLoc_Y = (height-2) - tBox_Y;
+
+		int x_Pos = 0;
+		int y_Pos = 0;
+
+		for (int y=0; y<height; y++){
+			for (int x=0; x<width+1; x++){
+				if ((x >= bLoc_X && y >= bLoc_Y) && (x < bLoc_X+tBox_X && y < bLoc_Y+tBox_Y)) *(*frame+(x+(y*(width+1)))) = ' ';
+				if ((x >= bLoc_X+1 && y >= bLoc_Y+1) && (x < bLoc_X+tBox_X-1 && y < bLoc_Y+tBox_Y-1)) *(*frame+(x+(y*(width+1)))) = vStream.subs[y_Pos++/(tBox_X-2)][x_Pos++%(tBox_X-2)];
+			}
+		}
+
+	} else if (vStream.time >= end){
+		vStream.subPos++;
+		currLine = (int) *(vStream.subTimes+(vStream.subPos)*3+2);
+		if (vStream.fpPos <= currLine+1){
+			while(fgets(buffer, sizeof(buffer), subFile) != NULL){
+				if (vStream.fpPos == currLine){
+					prepSubs(buffer);
+					strcpy(vStream.subs[0], buffer);
+					reading = 1;
+				} else if (reading){
+					prepSubs(buffer);
+					strcpy(vStream.subs[1], buffer);
+					vStream.fpPos++;
+					reading = 0;
+					break;
+				}
+				vStream.fpPos++;
+			}
+		}
+	}
+
 }
 
 // Compare two timeval structs to determine difference
@@ -316,6 +459,8 @@ int main(int argc, char *argv[]){
 	noecho();
 	curs_set(FALSE);
 
+	regcomp(&matchTime, MATCH_EXPR , 0);
+
 	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
 	videoBuffer->frame = NULL;
 	videoBuffer->next = NULL;
@@ -324,6 +469,9 @@ int main(int argc, char *argv[]){
 	vStream.bufferLength = 0;
 	vStream.time = 0;
 	vStream.subFile = "sub.srt";
+	vStream.subTimes = NULL;
+	vStream.fpPos = 0;
+	vStream.subPos = 0;
 
 	pthread_t threads[NUM_THREADS];
 
@@ -331,7 +479,7 @@ int main(int argc, char *argv[]){
 
 	struct vStreamArgs *vArgs = (struct vStreamArgs*) malloc(sizeof(struct vStreamArgs*));
 
-	vArgs->file = "mp4.mp4";
+	vArgs->file = "shrek.mp4";
 	vArgs->buffer = videoBuffer;
 
 	pthread_create(&threads[0], NULL, openStream, vArgs);
@@ -340,6 +488,7 @@ int main(int argc, char *argv[]){
 	pthread_join(threads[1], NULL);
 
 	free(vArgs);
+	if(vStream.subTimes != NULL) free(vStream.subTimes);
 
 	endwin();
 

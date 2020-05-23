@@ -1,6 +1,10 @@
 #define MAX_BUFFER 100
+#define MAX_CHAR 50
+#define NUM_ROWS 2
 #define NUM_THREADS 3
 #define NUM_CHANNELS 3
+#define TIME_CODE_LENGTH 11
+#define MATCH_EXPR "[0-9][0-9]:[0-9][0-9]:[0-9][0-9],[0-9][0-9][0-9] --> [0-9][0-9]:[0-9][0-9]:[0-9][0-9],[0-9][0-9][0-9]"
 #define CHAR_X 8
 #define CHAR_Y 8
 #define R 0
@@ -16,14 +20,18 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <ncurses.h>
+#include <regex.h>
 
 struct videoStream {
 	double fps;
 	int width;
 	int height;
-	int time;
+	double time;
 	char* subFile;
-	struct vBuffer* buffer;
+	double* subTimes;
+	char subs[2][MAX_CHAR];
+	int subPos;
+	int fpPos;
 	volatile int bufferLength;
 	volatile int semaphore;
 };
