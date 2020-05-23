@@ -1,7 +1,7 @@
 #define MAX_BUFFER 100
 #define MAX_CHAR 50
 #define NUM_ROWS 2
-#define NUM_THREADS 3
+#define NUM_THREADS 2
 #define NUM_CHANNELS 3
 #define TIME_CODE_LENGTH 11
 #define MATCH_EXPR "[0-9][0-9]:[0-9][0-9]:[0-9][0-9],[0-9][0-9][0-9] --> [0-9][0-9]:[0-9][0-9]:[0-9][0-9],[0-9][0-9][0-9]"

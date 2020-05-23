@@ -248,15 +248,19 @@ struct vBuffer** readBuffer(struct vBuffer **buffer){
 
 }
 
+// Convert time codes to seconds
 double decodeTime(char* time, int last){
 
+	// Determine offset based on which timecode we want
 	int offset = 0;
 	if (last) offset = 17;
 
+	// Multiplication factors
 	double factor[9] = {36000, 3600, 600, 60, 10, 1, 0.1, 0.01, 0.001};
 	int index = 0;
 	double result = 0.0;
 	
+	// Iterate over our timecode converting to seconds
 	for(int i=offset; i<=offset+TIME_CODE_LENGTH; i++){
 		if(*(time+i) == ':' || *(time+i) == ',') continue;
 		result += (((int) *(time+i)) - '0') * factor[index++];
@@ -271,22 +275,29 @@ void loadSubs(){
 
 	char buffer[MAX_CHAR];
 
+	// Open our file for reading
 	subFile = fopen(vStream.subFile, "r");
 
+	// Return if no file provided
 	if (!subFile) return;
 
 	int lines = 0;
 
+	// Determine how much space we need for storing data
 	while(fgets(buffer, sizeof(buffer), subFile) != NULL){
 		if(!regexec(&matchTime, buffer, 0, NULL, 0)) lines++;
 	}
 
+	// Reset file pointer
 	rewind(subFile);
 
+	// Allocate space for our sub data
 	vStream.subTimes = malloc(sizeof(double) * lines * 3);
 	int count = 0;
 	lines = 0;
 
+	// Write our subtitle data
+	// Format [start time, end time, first line of text, ...]
 	while(fgets(buffer, sizeof(buffer), subFile) != NULL){
 		if(!regexec(&matchTime, buffer, 0, NULL, 0)){
 			*(vStream.subTimes+(count++)) = decodeTime(buffer, 0);
@@ -296,6 +307,7 @@ void loadSubs(){
 		lines++;
 	}
 
+	// Reset file pointer
 	rewind(subFile);
 
 }
@@ -334,24 +346,29 @@ void *renderingEngine(struct vBuffer *buffer){
 		}
 	}
 
+	// Free memory
 	free(buffer);
 	fclose(subFile);
 	pthread_exit(0);
 }
 
+// Strip unwanted characters from strings and center them
 void prepSubs(char *str){
 
 	char newString[MAX_CHAR];
 	int iterator = 0;
 
+	// Strip newline and quotes
 	for(int i=0; i<MAX_CHAR; i++){
 		if (*(str+i) != '\n' && *(str+i) != '"') newString[iterator++] = *(str+i);
 	}
 
+	// Determine center offset
 	int length = strlen(newString);
 	int offset = (MAX_CHAR-length)/2;
 	iterator = 0;
 
+	// Update string to centered and stripped text
 	for (int i=0; i<MAX_CHAR; i++){
 		*(str+i) = ' ';
 		if (i >= offset-1 && i < offset+length-2) *(str+i) = newString[iterator++];
@@ -371,7 +388,9 @@ void generateSubs(char **frame){
 	// Initialize the subtitles
 	if (vStream.subPos == 0){
 		if(vStream.fpPos == 0){
+			// Iterate over the subtitles until we find what we want
 			while(fgets(buffer, sizeof(buffer), subFile) != NULL){
+				// Copy the two subtitle strings
 				if (vStream.fpPos == currLine){
 					prepSubs(buffer);
 					strcpy(vStream.subs[0], buffer);
@@ -388,25 +407,34 @@ void generateSubs(char **frame){
 		}
 	}
 
+	// Render our subtitles between start and stop times
 	if (vStream.time >= start && vStream.time < end){
 
+		// Total display width is a function of character size
 		int width = vStream.width/CHAR_X;
 		int height = vStream.height/CHAR_Y;
 
+		// Calculate bounding box for our subtitles
 		int tBox_X = MAX_CHAR+2, tBox_Y = NUM_ROWS+2;
 		int bLoc_X = (width/2) - (tBox_X/2), bLoc_Y = (height-2) - tBox_Y;
 
+		// Tracker variables
 		int x_Pos = 0;
 		int y_Pos = 0;
 
+		// Render our text box
 		for (int y=0; y<height; y++){
 			for (int x=0; x<width+1; x++){
+				// Fill box with blank characters
 				if ((x >= bLoc_X && y >= bLoc_Y) && (x < bLoc_X+tBox_X && y < bLoc_Y+tBox_Y)) *(*frame+(x+(y*(width+1)))) = ' ';
+				// Render text within the bounding box
 				if ((x >= bLoc_X+1 && y >= bLoc_Y+1) && (x < bLoc_X+tBox_X-1 && y < bLoc_Y+tBox_Y-1)) *(*frame+(x+(y*(width+1)))) = vStream.subs[y_Pos++/(tBox_X-2)][x_Pos++%(tBox_X-2)];
 			}
 		}
 
-	} else if (vStream.time >= end){
+	}
+	// Update our file pointer and subtitles
+	else if (vStream.time >= end){
 		vStream.subPos++;
 		currLine = (int) *(vStream.subTimes+(vStream.subPos)*3+2);
 		if (vStream.fpPos <= currLine+1){
@@ -455,17 +483,21 @@ int timeval_subtract (result, x, y)
 // Spawn all neccessary threads and manage them
 int main(int argc, char *argv[]){
 
+	// Initialize display
 	initscr();
 	noecho();
 	curs_set(FALSE);
 
+	// Setup regex
 	regcomp(&matchTime, MATCH_EXPR , 0);
 
+	// Initialize our video buffer
 	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
 	videoBuffer->frame = NULL;
 	videoBuffer->next = NULL;
 	videoBuffer->time = 0;
 
+	// Initialize the parameters of our video stream
 	vStream.bufferLength = 0;
 	vStream.time = 0;
 	vStream.subFile = "sub.srt";
@@ -473,23 +505,28 @@ int main(int argc, char *argv[]){
 	vStream.fpPos = 0;
 	vStream.subPos = 0;
 
+	// Setup thread tracking
 	pthread_t threads[NUM_THREADS];
 
+	// Register codecs
 	av_register_all();
 
+	// Prepare data for the stream
 	struct vStreamArgs *vArgs = (struct vStreamArgs*) malloc(sizeof(struct vStreamArgs*));
-
 	vArgs->file = "shrek.mp4";
 	vArgs->buffer = videoBuffer;
 
+	// Create and track our threads
 	pthread_create(&threads[0], NULL, openStream, vArgs);
 	pthread_create(&threads[1], NULL, renderingEngine, videoBuffer);
 	pthread_join(threads[0], NULL);
 	pthread_join(threads[1], NULL);
 
+	// Free allocated memory
 	free(vArgs);
 	if(vStream.subTimes != NULL) free(vStream.subTimes);
 
+	// Terminate our screen
 	endwin();
 
 	return 0;
