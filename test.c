@@ -175,6 +175,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 	width = width/CHAR_X;
 	height = height/CHAR_Y;
 
+	// Determine our text offset to center the screen
 	x = (x-width)/2;
 	y = (y-height)/2+(y-height)%2;
 
