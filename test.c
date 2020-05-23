@@ -129,7 +129,7 @@ void openStream(struct vStreamArgs* args){
 					pFrame->linesize, 0, pCodecCtx->height,
 					pFrameRGB->data, pFrameRGB->linesize);
 
-				if (enableFramePacing && ((frame++)%((int) enableFramePacing/(int) vStream.fps))) continue;
+				if (enableFramePacing && ((frame++)%((int) ceil(enableFramePacing)/(int) ceil(vStream.fps)))) continue;
 				// Wait until there is room in the frame buffer
 				while(vStream.bufferLength >= MAX_BUFFER) nanosleep(&wait, (struct timespec*) NULL);
 				// Write the new frame to the buffer
@@ -231,7 +231,6 @@ void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
 
 	// Update frame buffer
 	(*buffer)->next->next = NULL;
-	(*buffer)->next->time = (*buffer)->time + (1/vStream.fps);
 	vStream.bufferLength++;
 
 	vStream.semaphore = 0;
@@ -346,7 +345,7 @@ void *renderingEngine(struct vBuffer *buffer){
 			// Pull the new frame data from the buffer
 			while(buffer->next == NULL);
 			buffer = readBuffer(&buffer);
-			vStream.time = buffer->time;
+			vStream.time = vStream.time + (1/vStream.fps);
 			// Pass frame data to renderer
 			renderFrame(buffer->frame, vStream.width, vStream.height);
 
@@ -508,7 +507,6 @@ int main(int argc, char *argv[]){
 	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
 	videoBuffer->frame = NULL;
 	videoBuffer->next = NULL;
-	videoBuffer->time = 0;
 
 	// Initialize the parameters of our video stream
 	vStream.bufferLength = 0;

@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <ncurses.h>
 #include <regex.h>
+#include <math.h>
 
 struct videoStream {
 	double fps;
@@ -39,7 +40,6 @@ struct videoStream {
 struct vBuffer {
 	uint8_t *frame;
 	struct vBuffer *next;
-	double time;
 };
 
 struct vStreamArgs {
