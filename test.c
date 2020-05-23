@@ -167,7 +167,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 	AsciiArtRender(&sRender, img, &width, &height, zText, 1);
 
 	// Generate subtitles
-	generateSubs(&zText);
+	if(vStream.subFile != NULL) generateSubs(&zText);
 
 	int x = 0, y = 0;
 	getmaxyx(stdscr, y, x);
@@ -316,7 +316,7 @@ void loadSubs(){
 // Run continuously in the background rendering frames when needed
 void *renderingEngine(struct vBuffer *buffer){
 
-	loadSubs();
+	if (vStream.subFile != NULL) loadSubs();
 
 	// Timing variables
 	struct timeval start, curr, diff;
@@ -484,6 +484,36 @@ int timeval_subtract (result, x, y)
 // Spawn all neccessary threads and manage them
 int main(int argc, char *argv[]){
 
+	char* filename = NULL;
+	char* subfile = NULL;
+	char* flag;
+
+	for (int i=1; i<argc; i++){
+		flag = *(argv+i);
+		
+		if (!strcmp(flag, "-f")){
+			i++;
+			filename = malloc(sizeof(char) * strlen(*(argv+i)));
+			filename = *(argv+i);
+		}
+
+		if (!strcmp(flag, "-s")){
+			i++;
+			subfile = malloc(sizeof(char) * strlen(*(argv+i)));
+			subfile = *(argv+i);
+		}
+
+		if (!strcmp(flag, "-h")){
+			printf("Usage ./telnetflix -f <FILENAME> [ -s <SUBFILE> ]\n");
+			return 0;
+		}
+	}
+
+	if (filename == NULL){
+		printf("Error, no file specified\n");
+		return -1;
+	}
+
 	// Initialize display
 	initscr();
 	noecho();
@@ -501,7 +531,7 @@ int main(int argc, char *argv[]){
 	// Initialize the parameters of our video stream
 	vStream.bufferLength = 0;
 	vStream.time = 0;
-	vStream.subFile = "sub.srt";
+	vStream.subFile = subfile;
 	vStream.subTimes = NULL;
 	vStream.fpPos = 0;
 	vStream.subPos = 0;
@@ -514,7 +544,7 @@ int main(int argc, char *argv[]){
 
 	// Prepare data for the stream
 	struct vStreamArgs *vArgs = (struct vStreamArgs*) malloc(sizeof(struct vStreamArgs*));
-	vArgs->file = "shrek.mp4";
+	vArgs->file = filename;
 	vArgs->buffer = videoBuffer;
 
 	// Create and track our threads
@@ -525,6 +555,8 @@ int main(int argc, char *argv[]){
 
 	// Free allocated memory
 	free(vArgs);
+	free(filename);
+	free(subfile);
 	if(vStream.subTimes != NULL) free(vStream.subTimes);
 
 	// Terminate our screen
