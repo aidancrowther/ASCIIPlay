@@ -375,6 +375,9 @@ void prepSubs(char *str){
 		if (i >= offset-1 && i < offset+length-2) *(str+i) = newString[iterator++];
 	}
 
+	// Declare the end of our string
+	*(str+MAX_CHAR) = '\0';
+
 }
 
 // Superimpose subtitles over the generated ASCII
