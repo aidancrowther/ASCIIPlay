@@ -11,6 +11,8 @@ struct videoStream vStream;
 FILE* subFile;
 regex_t matchTime;
 
+struct timespec wait;
+
 uint8_t* grayscale(AVFrame *pFrame, int width, int height){
 	uint8_t *img = (uint8_t*) malloc(width*height * sizeof(uint8_t*));
 	uint8_t pixel[NUM_CHANNELS];
@@ -41,6 +43,8 @@ void openStream(struct vStreamArgs* args){
 	AVFrame *pFrame = NULL;
 	AVFrame *pFrameRGB = NULL;
 
+	double enableFramePacing = 0;
+
 	// Open video file
 	if(avformat_open_input(&pFormatCtx, filename, NULL, NULL) != 0)
 		pthread_exit(1); // Couldn't open file
@@ -61,7 +65,8 @@ void openStream(struct vStreamArgs* args){
 		}
 	}
 
-	vStream.fps = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;
+	if(vStream.fps == 0.0) vStream.fps = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;
+	else enableFramePacing = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;;
 	vStream.height = pFormatCtx->streams[stream]->codecpar->height;
 	vStream.width = pFormatCtx->streams[stream]->codecpar->width*2;
 
@@ -109,6 +114,8 @@ void openStream(struct vStreamArgs* args){
 		NULL
 	);
 
+	int frame = 0;
+
 	while(av_read_frame(pFormatCtx, &packet) >= 0){
 		// Check that the packet is from our stream
 		if (packet.stream_index == stream){
@@ -122,8 +129,9 @@ void openStream(struct vStreamArgs* args){
 					pFrame->linesize, 0, pCodecCtx->height,
 					pFrameRGB->data, pFrameRGB->linesize);
 
+				if (enableFramePacing && ((frame++)%((int) enableFramePacing/(int) vStream.fps))) continue;
 				// Wait until there is room in the frame buffer
-				while(vStream.bufferLength >= MAX_BUFFER);
+				while(vStream.bufferLength >= MAX_BUFFER) nanosleep(&wait, (struct timespec*) NULL);
 				// Write the new frame to the buffer
 				writeBuffer(&videoBuffer, pFrameRGB);
 
@@ -207,7 +215,7 @@ void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
 	struct vBuffer *newBuffer;
 
 	// Wait for the semaphore
-	while (vStream.semaphore != 0);
+	while (vStream.semaphore != 0) nanosleep(&wait, (struct timespec*) NULL);;
 	vStream.semaphore = 1;
 
 	// Find the ned of the buffer
@@ -234,11 +242,10 @@ struct vBuffer** readBuffer(struct vBuffer **buffer){
 	struct vBuffer *nextBuffer;
 
 	// Wait for the semaphore so we don't cause any issues
-	while (vStream.semaphore != 0);
+	while (vStream.semaphore != 0) nanosleep(&wait, (struct timespec*) NULL);;
 	vStream.semaphore = 1;
 
 	// Update buffer and queue
-	//if((*buffer)->time >= 2.0) sleep(5);
 	nextBuffer = (*buffer)->next;
 	free((*buffer)->frame);
 	free(*buffer);
@@ -326,7 +333,7 @@ void *renderingEngine(struct vBuffer *buffer){
 	while(1){
 
 		// Thread may be ready before the frames are, so wait for frames
-		while(vStream.bufferLength <= 0);
+		while(vStream.bufferLength <= 0) nanosleep(&wait, (struct timespec*) NULL);;
 
 		// Update time tracking
 		gettimeofday(&curr, 0x0);
@@ -345,6 +352,8 @@ void *renderingEngine(struct vBuffer *buffer){
 
 			if(buffer->next == NULL) break;
 		}
+
+		nanosleep(&wait, (struct timespec*) NULL);
 	}
 
 	// Free memory
@@ -490,6 +499,27 @@ int main(int argc, char *argv[]){
 	char* filename = NULL;
 	char* subfile = NULL;
 	char* flag;
+	int slowMode = 0;
+
+	wait.tv_nsec = 1000000;
+
+	// Initialize our video buffer
+	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
+	videoBuffer->frame = NULL;
+	videoBuffer->next = NULL;
+	videoBuffer->time = 0;
+
+	// Initialize the parameters of our video stream
+	vStream.bufferLength = 0;
+	vStream.time = 0;
+	vStream.subFile = subfile;
+	vStream.subTimes = NULL;
+	vStream.fpPos = 0;
+	vStream.subPos = 0;
+	vStream.fps = 0.0;
+
+	// Setup thread tracking
+	pthread_t threads[NUM_THREADS];
 
 	for (int i=1; i<argc; i++){
 		flag = *(argv+i);
@@ -504,6 +534,14 @@ int main(int argc, char *argv[]){
 			i++;
 			subfile = malloc(sizeof(char) * strlen(*(argv+i)));
 			subfile = *(argv+i);
+		}
+
+		if (!strcmp(flag, "--slow-mode")) slowMode = 1;
+
+		if (!strcmp(flag, "--frame-rate")){
+			i++;
+			if (strlen(*(argv+i)) > 1) vStream.fps = (((int) *(*(argv+i))-'0')*10) + ((int) (*(*(argv+i)+1)-'0'));
+			else vStream.fps = ((int) (*(*(argv+i))-'0'));
 		}
 
 		if (!strcmp(flag, "-h")){
@@ -525,23 +563,6 @@ int main(int argc, char *argv[]){
 	// Setup regex
 	regcomp(&matchTime, MATCH_EXPR , 0);
 
-	// Initialize our video buffer
-	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
-	videoBuffer->frame = NULL;
-	videoBuffer->next = NULL;
-	videoBuffer->time = 0;
-
-	// Initialize the parameters of our video stream
-	vStream.bufferLength = 0;
-	vStream.time = 0;
-	vStream.subFile = subfile;
-	vStream.subTimes = NULL;
-	vStream.fpPos = 0;
-	vStream.subPos = 0;
-
-	// Setup thread tracking
-	pthread_t threads[NUM_THREADS];
-
 	// Register codecs
 	av_register_all();
 
@@ -552,6 +573,7 @@ int main(int argc, char *argv[]){
 
 	// Create and track our threads
 	pthread_create(&threads[0], NULL, openStream, vArgs);
+	if (slowMode) sleep(4);
 	pthread_create(&threads[1], NULL, renderingEngine, videoBuffer);
 	pthread_join(threads[0], NULL);
 	pthread_join(threads[1], NULL);
