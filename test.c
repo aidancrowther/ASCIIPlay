@@ -500,6 +500,7 @@ int main(int argc, char *argv[]){
 	char* subfile = NULL;
 	char* flag;
 	int slowMode = 0;
+	int disableRenderer = 0;
 
 	wait.tv_nsec = 1000000;
 
@@ -512,7 +513,6 @@ int main(int argc, char *argv[]){
 	// Initialize the parameters of our video stream
 	vStream.bufferLength = 0;
 	vStream.time = 0;
-	vStream.subFile = subfile;
 	vStream.subTimes = NULL;
 	vStream.fpPos = 0;
 	vStream.subPos = 0;
@@ -534,9 +534,12 @@ int main(int argc, char *argv[]){
 			i++;
 			subfile = malloc(sizeof(char) * strlen(*(argv+i)));
 			subfile = *(argv+i);
+			vStream.subFile = subfile;\
 		}
 
 		if (!strcmp(flag, "--slow-mode")) slowMode = 1;
+
+		if (!strcmp(flag, "--no-render")) disableRenderer = 1;
 
 		if (!strcmp(flag, "--frame-rate")){
 			i++;
@@ -556,9 +559,11 @@ int main(int argc, char *argv[]){
 	}
 
 	// Initialize display
-	initscr();
-	noecho();
-	curs_set(FALSE);
+	if (!disableRenderer){
+		initscr();
+		noecho();
+		curs_set(FALSE);
+	}
 
 	// Setup regex
 	regcomp(&matchTime, MATCH_EXPR , 0);
