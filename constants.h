@@ -1,3 +1,6 @@
+#ifndef CONSTANTS
+#define CONSTANTS
+
 #define MAX_BUFFER 100
 #define MAX_CHAR 50
 #define NUM_ROWS 2
@@ -25,9 +28,11 @@
 
 struct videoStream {
 	double fps;
+	double srcFps;
 	int width;
 	int height;
 	double time;
+	double realTime;
 	char* subFile;
 	double* subTimes;
 	char subs[2][MAX_CHAR];
@@ -40,9 +45,18 @@ struct videoStream {
 struct vBuffer {
 	uint8_t *frame;
 	struct vBuffer *next;
+	double timestamp;
 };
 
 struct vStreamArgs {
 	char *file;
 	struct vBuffer *buffer;
 };
+
+struct videoStream vStream;
+FILE* subFile;
+regex_t matchTime;
+struct timespec wait;
+int debug;
+
+#endif

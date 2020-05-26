@@ -5,33 +5,9 @@
 #define clrscr() printf("\e[1;1H\e[2J")
 #endif
 
-#include "test.h"
+#include "main.h"
 
-struct videoStream vStream;
-FILE* subFile;
-regex_t matchTime;
-
-struct timespec wait;
-
-uint8_t* grayscale(AVFrame *pFrame, int width, int height){
-	uint8_t *img = (uint8_t*) malloc(width*height * sizeof(uint8_t*));
-	uint8_t pixel[NUM_CHANNELS];
-
-	// Iterate over the frame buffer
-	for(int y = 0; y < height; y++){
-		for(int x = 0; x < width*3; x += 3){
-			for(int channel=0; channel < NUM_CHANNELS; channel++){
-				// Capture pixel data for each channel
-				pixel[channel] = *(pFrame->data[0]+y*(pFrame->linesize[0])+(x/2)+channel);
-			}
-			// Convert the three channels to a grayscale representation
-			*(img+(x/3)+y*width) = (pixel[R] + pixel[G] + pixel[B])/NUM_CHANNELS;
-		}
-	}
-
-	return img;
-}
-
+// Open up the file data stream and parse frames
 void openStream(struct vStreamArgs* args){
 
 	char *filename = args->file;
@@ -44,6 +20,7 @@ void openStream(struct vStreamArgs* args){
 	AVFrame *pFrameRGB = NULL;
 
 	double enableFramePacing = 0;
+	int frameAdjustment = 0;
 
 	// Open video file
 	if(avformat_open_input(&pFormatCtx, filename, NULL, NULL) != 0)
@@ -65,8 +42,15 @@ void openStream(struct vStreamArgs* args){
 		}
 	}
 
-	if(vStream.fps == 0.0) vStream.fps = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;
-	else enableFramePacing = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;;
+	if(vStream.fps == 0.0){
+		vStream.fps = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;
+		vStream.srcFps = vStream.fps;
+	}
+	else{
+		enableFramePacing = (double) pFormatCtx->streams[stream]->avg_frame_rate.num / (double) pFormatCtx->streams[stream]->avg_frame_rate.den;
+		frameAdjustment = getNiceFramerate(enableFramePacing);
+		vStream.srcFps = enableFramePacing;
+	}
 	vStream.height = pFormatCtx->streams[stream]->codecpar->height;
 	vStream.width = pFormatCtx->streams[stream]->codecpar->width*2;
 
@@ -114,9 +98,7 @@ void openStream(struct vStreamArgs* args){
 		NULL
 	);
 
-	int frame = 0;
-
-	while(av_read_frame(pFormatCtx, &packet) >= 0){
+	for(int frame=0; av_read_frame(pFormatCtx, &packet) >= 0; frame++){
 		// Check that the packet is from our stream
 		if (packet.stream_index == stream){
 			// Decode frame
@@ -129,7 +111,7 @@ void openStream(struct vStreamArgs* args){
 					pFrame->linesize, 0, pCodecCtx->height,
 					pFrameRGB->data, pFrameRGB->linesize);
 
-				if (enableFramePacing && ((frame++)%((int) ceil(enableFramePacing)/(int) ceil(vStream.fps)))) continue;
+				if (enableFramePacing && ((frame)%(int) ((enableFramePacing)/(vStream.fps)))) continue;
 				// Wait until there is room in the frame buffer
 				while(vStream.bufferLength >= MAX_BUFFER) nanosleep(&wait, (struct timespec*) NULL);
 				// Write the new frame to the buffer
@@ -157,57 +139,6 @@ void openStream(struct vStreamArgs* args){
 	avformat_close_input(&pFormatCtx);
 
 	pthread_exit(0);
-}
-
-void renderFrame(uint8_t *img, int width, int height) {
-	ascii_render sRender;
-
-	unsigned char *zText;
-	unsigned int nBytes;
-	
-	AsciiArtInit(&sRender);
-
-	// Allocate space for ascii frame
-	nBytes = AsciiArtTextBufSize(&sRender, width, height);
-	zText = malloc(nBytes);
-
-	// Call ASCII renderer
-	AsciiArtRender(&sRender, img, &width, &height, zText, 1);
-
-	// Generate subtitles
-	if(vStream.subFile != NULL) generateSubs(&zText);
-
-	int x = 0, y = 0;
-	getmaxyx(stdscr, y, x);
-
-	width = width/CHAR_X;
-	height = height/CHAR_Y;
-
-	// Determine our text offset to center the screen
-	x = (x-width)/2;
-	y = (y-height)/2+(y-height)%2;
-
-	int newBytes = nBytes-height;
-	unsigned char stripped[newBytes];
-	
-	// Strip newline characters from the output stream
-	int count = 0;
-	for (int i = 0; i<nBytes; i++){
-		if (*(zText+i) != '\n'){
-			stripped[count++] = *(zText+i);
-		}
-	}
-
-	// Print ASCII to screen
-	for (int i=0; i<newBytes; i++){
-		mvaddch(y+i/width, x+i%width, stripped[i]);
-	}
-	refresh();
-
-	// Free allocated memory
-	free(zText);
-
-	return;
 }
 
 // Write new frame data to the tail of the buffer queue
@@ -252,28 +183,6 @@ struct vBuffer** readBuffer(struct vBuffer **buffer){
 	vStream.semaphore = 0;
 
 	return &(*nextBuffer);
-
-}
-
-// Convert time codes to seconds
-double decodeTime(char* time, int last){
-
-	// Determine offset based on which timecode we want
-	int offset = 0;
-	if (last) offset = 17;
-
-	// Multiplication factors
-	double factor[9] = {36000, 3600, 600, 60, 10, 1, 0.1, 0.01, 0.001};
-	int index = 0;
-	double result = 0.0;
-	
-	// Iterate over our timecode converting to seconds
-	for(int i=offset; i<=offset+TIME_CODE_LENGTH; i++){
-		if(*(time+i) == ':' || *(time+i) == ',') continue;
-		result += (((int) *(time+i)) - '0') * factor[index++];
-	}
-
-	return result;
 
 }
 
@@ -339,15 +248,17 @@ void *renderingEngine(struct vBuffer *buffer){
 		timeval_subtract(&diff, &curr, &start);
 
 		// If enough time has passed between the last frame and this one render it
-		if (diff.tv_usec >= (1/vStream.fps)*1000000){
+		if (diff.tv_usec >= (1/vStream.fps*(vStream.fps/vStream.srcFps))*1000000){
 			// Update our timing variable
 			gettimeofday(&start, 0x0);
 			// Pull the new frame data from the buffer
 			while(buffer->next == NULL);
 			buffer = readBuffer(&buffer);
-			vStream.time = vStream.time + (1/vStream.fps);
+			vStream.time = vStream.time + (1/(vStream.fps*(vStream.srcFps/vStream.fps)));
 			// Pass frame data to renderer
 			renderFrame(buffer->frame, vStream.width, vStream.height);
+
+			while (vStream.time >= 4979.00);
 
 			if(buffer->next == NULL) break;
 		}
@@ -359,137 +270,6 @@ void *renderingEngine(struct vBuffer *buffer){
 	free(buffer);
 	fclose(subFile);
 	pthread_exit(0);
-}
-
-// Strip unwanted characters from strings and center them
-void prepSubs(char *str){
-
-	char newString[MAX_CHAR];
-	int iterator = 0;
-
-	// Strip newline and quotes
-	for(int i=0; i<MAX_CHAR; i++){
-		if (*(str+i) != '\n' && *(str+i) != '"') newString[iterator++] = *(str+i);
-	}
-
-	// Determine center offset
-	int length = strlen(newString);
-	int offset = (MAX_CHAR-length)/2;
-	iterator = 0;
-
-	// Update string to centered and stripped text
-	for (int i=0; i<MAX_CHAR; i++){
-		*(str+i) = ' ';
-		if (i >= offset-1 && i < offset+length-2) *(str+i) = newString[iterator++];
-	}
-
-	// Declare the end of our string
-	*(str+MAX_CHAR) = '\0';
-
-}
-
-// Superimpose subtitles over the generated ASCII
-void generateSubs(char **frame){
-
-	char buffer[MAX_CHAR];
-	double start = *(vStream.subTimes+vStream.subPos*3+0);
-	double end = *(vStream.subTimes+vStream.subPos*3+1);
-	int currLine = (int) *(vStream.subTimes+vStream.subPos*3+2);
-	int reading = 0;
-
-	// Initialize the subtitles
-	if (vStream.subPos == 0){
-		if(vStream.fpPos == 0){
-			// Iterate over the subtitles until we find what we want
-			while(fgets(buffer, sizeof(buffer), subFile) != NULL){
-				// Copy the two subtitle strings
-				if (vStream.fpPos == currLine){
-					prepSubs(buffer);
-					strcpy(vStream.subs[0], buffer);
-					reading = 1;
-				} else if (reading){
-					prepSubs(buffer);
-					strcpy(vStream.subs[1], buffer);
-					vStream.fpPos++;
-					reading = 0;
-					break;
-				}
-				vStream.fpPos++;
-			}
-		}
-	}
-
-	// Render our subtitles between start and stop times
-	if (vStream.time >= start && vStream.time < end){
-
-		// Total display width is a function of character size
-		int width = vStream.width/CHAR_X;
-		int height = vStream.height/CHAR_Y;
-
-		// Calculate bounding box for our subtitles
-		int tBox_X = MAX_CHAR+2, tBox_Y = NUM_ROWS+2;
-		int bLoc_X = (width/2) - (tBox_X/2), bLoc_Y = (height-2) - tBox_Y;
-
-		// Tracker variables
-		int x_Pos = 0;
-		int y_Pos = 0;
-
-		// Render our text box
-		for (int y=0; y<height; y++){
-			for (int x=0; x<width+1; x++){
-				// Fill box with blank characters
-				if ((x >= bLoc_X && y >= bLoc_Y) && (x < bLoc_X+tBox_X && y < bLoc_Y+tBox_Y)) *(*frame+(x+(y*(width+1)))) = ' ';
-				// Render text within the bounding box
-				if ((x >= bLoc_X+1 && y >= bLoc_Y+1) && (x < bLoc_X+tBox_X-1 && y < bLoc_Y+tBox_Y-1)) *(*frame+(x+(y*(width+1)))) = vStream.subs[y_Pos++/(tBox_X-2)][x_Pos++%(tBox_X-2)];
-			}
-		}
-
-	}
-	// Update our file pointer and subtitles
-	else if (vStream.time >= end){
-		vStream.subPos++;
-		currLine = (int) *(vStream.subTimes+(vStream.subPos)*3+2);
-		if (vStream.fpPos <= currLine+1){
-			while(fgets(buffer, sizeof(buffer), subFile) != NULL){
-				if (vStream.fpPos == currLine){
-					prepSubs(buffer);
-					strcpy(vStream.subs[0], buffer);
-					reading = 1;
-				} else if (reading){
-					prepSubs(buffer);
-					strcpy(vStream.subs[1], buffer);
-					vStream.fpPos++;
-					reading = 0;
-					break;
-				}
-				vStream.fpPos++;
-			}
-		}
-	}
-
-}
-
-// Compare two timeval structs to determine difference
-int timeval_subtract (result, x, y)
-     struct timeval *result, *x, *y;
-{
-  /* Perform the carry for the later subtraction by updating y. */
-  if (x->tv_usec < y->tv_usec) {
-    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
-    y->tv_usec -= 1000000 * nsec;
-    y->tv_sec += nsec;
-  }
-  if (x->tv_usec - y->tv_usec > 1000000) {
-    int nsec = (y->tv_usec - x->tv_usec) / 1000000;
-    y->tv_usec += 1000000 * nsec;
-    y->tv_sec -= nsec;
-  }
-
-  result->tv_sec = x->tv_sec - y->tv_sec;
-  result->tv_usec = x->tv_usec - y->tv_usec;
-
-  /* Return 1 if result is negative. */
-  return x->tv_sec < y->tv_sec;
 }
 
 // Spawn all neccessary threads and manage them
@@ -538,6 +318,8 @@ int main(int argc, char *argv[]){
 		if (!strcmp(flag, "--slow-mode")) slowMode = 1;
 
 		if (!strcmp(flag, "--no-render")) disableRenderer = 1;
+
+		if (!strcmp(flag, "--debug")) debug = 1;
 
 		if (!strcmp(flag, "--frame-rate")){
 			i++;

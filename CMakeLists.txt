@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project( shrek )
+project( telnetflix )
 include_directories( Lib )
-add_executable( shrek test.c )
-target_link_libraries( shrek ${OpenCV_LIBS} -I ./include -L./lib -lavformat -lavcodec -lswscale -lavutil -lswresample -lz -lm -lpthread)
+add_executable( telnetflix main.c helpers.c Lib/ascii_art.c renderer.c )
+target_link_libraries( telnetflix -I ./include -L./lib -lavformat -lavcodec -lswscale -lavutil -lswresample -lz -lm -lpthread -lcurses)
