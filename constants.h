@@ -33,6 +33,7 @@ struct videoStream {
 	int height;
 	double time;
 	double realTime;
+	int frameCount;
 	char* subFile;
 	double* subTimes;
 	char subs[2][MAX_CHAR];
@@ -58,5 +59,6 @@ FILE* subFile;
 regex_t matchTime;
 struct timespec wait;
 int debug;
+int skew;
 
 #endif

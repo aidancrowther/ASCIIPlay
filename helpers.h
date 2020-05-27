@@ -14,4 +14,6 @@ int timeval_subtract (struct timeval *result, struct timeval *x, struct timeval 
 
 int getNiceFramerate(double framerate);
 
+uint8_t* reduceFrame(uint8_t *src, int width, int height, int factor);
+
 #endif

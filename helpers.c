@@ -70,3 +70,20 @@ int timeval_subtract (result, x, y)
   /* Return 1 if result is negative. */
   return x->tv_sec < y->tv_sec;
 }
+
+uint8_t* reduceFrame(uint8_t *src, int width, int height, int factor){
+	
+	uint8_t *img = malloc(sizeof(uint8_t) * (width)*(height));
+
+	for (int y=0; y<height/factor; y++){
+		for (int x=0; x<width/factor; x++){
+			for(int z=0; z<factor*factor; z++){
+				*(img+x+(y*(height/factor))) += *(src+(x*factor)+(y*width)+(z%factor)+(y*width)*(z/factor));
+			}
+			*(img+x+(y*(height/factor))) /= factor*factor;
+		}
+	}
+
+	return &img;
+
+}

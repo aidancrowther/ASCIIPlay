@@ -39,6 +39,11 @@ void renderFrame(uint8_t *img, int width, int height) {
 		}
 	}
 
+	// Clear buffer region
+	for (int i=0; i<width*height; i++){
+		mvaddch(i/width, i%width, ' ');
+	}
+
 	// Print ASCII to screen
 	for (int i=0; i<newBytes; i++){
 		mvaddch(y+i/width, x+i%width, stripped[i]);
@@ -102,8 +107,6 @@ void prepSubs(char *str){
 // Superimpose subtitles over the generated ASCII
 void generateSubs(char **frame){
 
-	if(vStream.time > 54.00) printf("%d\n", vStream.subPos);
-
 	char buffer[MAX_CHAR];
 	double start = *(vStream.subTimes+vStream.subPos*3+0);
 	double end = *(vStream.subTimes+vStream.subPos*3+1);
@@ -162,6 +165,7 @@ void generateSubs(char **frame){
 	else if (vStream.time >= end){
 		vStream.subPos++;
 		currLine = (int) *(vStream.subTimes+(vStream.subPos)*3+2);
+		int subPos = vStream.subPos;
 		if (vStream.fpPos <= currLine+1){
 			while(fgets(buffer, sizeof(buffer), subFile) != NULL){
 				if (vStream.fpPos == currLine){
@@ -178,6 +182,7 @@ void generateSubs(char **frame){
 				vStream.fpPos++;
 			}
 		}
+		vStream.subPos = subPos;
 	}
 
 }

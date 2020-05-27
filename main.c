@@ -111,7 +111,9 @@ void openStream(struct vStreamArgs* args){
 					pFrame->linesize, 0, pCodecCtx->height,
 					pFrameRGB->data, pFrameRGB->linesize);
 
-				if (enableFramePacing && ((frame)%(int) ((enableFramePacing)/(vStream.fps)))) continue;
+				vStream.frameCount++;
+				vStream.realTime = (vStream.frameCount-(vStream.bufferLength*(vStream.srcFps/vStream.fps)))/vStream.srcFps;
+				if (enableFramePacing && ((frame)%(int) ((ceil(enableFramePacing))/(vStream.fps)))) continue;
 				// Wait until there is room in the frame buffer
 				while(vStream.bufferLength >= MAX_BUFFER) nanosleep(&wait, (struct timespec*) NULL);
 				// Write the new frame to the buffer
@@ -236,29 +238,34 @@ void *renderingEngine(struct vBuffer *buffer){
 	// Timing variables
 	struct timeval start, curr, diff;
 	gettimeofday(&start, 0x0);
+	int frameDigits = 0;
 
 	// Run until we hit the streamEnd frame
 	while(1){
 
 		// Thread may be ready before the frames are, so wait for frames
-		while(vStream.bufferLength <= 0) nanosleep(&wait, (struct timespec*) NULL);;
+		while(vStream.bufferLength <= 0) nanosleep(&wait, (struct timespec*) NULL);
+
+		if (frameDigits == 0) frameDigits = getNiceFramerate(vStream.srcFps);
 
 		// Update time tracking
 		gettimeofday(&curr, 0x0);
 		timeval_subtract(&diff, &curr, &start);
 
 		// If enough time has passed between the last frame and this one render it
-		if (diff.tv_usec >= (1/vStream.fps*(vStream.fps/vStream.srcFps))*1000000){
+		if (diff.tv_usec >= (1/vStream.fps*1000000)){
 			// Update our timing variable
 			gettimeofday(&start, 0x0);
 			// Pull the new frame data from the buffer
 			while(buffer->next == NULL);
 			buffer = readBuffer(&buffer);
-			vStream.time = vStream.time + (1/(vStream.fps*(vStream.srcFps/vStream.fps)));
+			vStream.time = vStream.time + (1/(vStream.fps));
+
+			// Account for possible frame skew when rendering at different framerates
+			if (!skew && (vStream.time > 1.02*vStream.realTime || vStream.time < 0.98*vStream.realTime)) vStream.time = vStream.realTime;
+
 			// Pass frame data to renderer
 			renderFrame(buffer->frame, vStream.width, vStream.height);
-
-			while (vStream.time >= 4979.00);
 
 			if(buffer->next == NULL) break;
 		}
@@ -320,6 +327,8 @@ int main(int argc, char *argv[]){
 		if (!strcmp(flag, "--no-render")) disableRenderer = 1;
 
 		if (!strcmp(flag, "--debug")) debug = 1;
+
+		if (!strcmp(flag, "--enable-skew")) skew = 1;
 
 		if (!strcmp(flag, "--frame-rate")){
 			i++;
