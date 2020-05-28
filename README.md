@@ -36,11 +36,11 @@ Roadmap:
    - [x] Improve error reporting
    - [ ] Auto Installer
    - [ ] Colour support
-   - [x] Audio renderer
+   - [ ] Audio renderer
    
 Requirements:
 
-    - Currently ASCIIPlay is in development status with no installation candidate, if you want to use it you will need to get the dependencies listed in order to compile
+   - Currently ASCIIPlay is in development status with no installation candidate, if you want to use it you will need to get the dependencies listed in order to compile
    
 Install:
 
