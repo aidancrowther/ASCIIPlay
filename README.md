@@ -4,9 +4,7 @@ Description:
 
   ASCIIPlay is a video player designed for the purpouse of rendering to ASCII any video file given to it, inspired by towel.blinkenlights.nl. The reasoning for my making my  own ASCII video player is due to the lack of an existing ASCII renderer with support for subtitle or audio playback. Thus I hope for  ASCIIPlay to develop to fill this niche. A server is currently publicly accessible to view an example of this project, and can be accessed using: `ssh anonymous@telnetflix.com -p 20`
   
-<p align="center">
-  <blockquote class="imgur-embed-pub" lang="en" data-id="iTExXwz"><a href="//imgur.com/iTExXwz"></a></blockquote><script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>
-</p>
+    ![](ASCIIPlay.gif)
   
 Goals:
 
