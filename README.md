@@ -38,7 +38,7 @@ Roadmap:
    - [ ] Colour support
    - [ ] Audio renderer
    - [x] Support Resizing
-    - [ ] Improve Resizing
+      - [ ] Improve Resizing
    
 Requirements:
 
