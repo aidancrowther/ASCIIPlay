@@ -12,8 +12,8 @@ void renderFrame(uint8_t *img, int width, int height) {
 	int scr_x = x, scr_y = y;
 
 	if(vStream.scr_width == 0 && vStream.scr_height == 0){
-		vStream.scr_width = scr_x;
-		vStream.scr_height = scr_y;
+		vStream.scr_width = width/CHAR_X;
+		vStream.scr_height = height/CHAR_Y;
 	} else if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
 		vStream.scr_width = scr_x;
 		vStream.scr_height = scr_y;
