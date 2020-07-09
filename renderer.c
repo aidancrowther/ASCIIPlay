@@ -39,11 +39,6 @@ void renderFrame(uint8_t *img, int width, int height) {
 		}
 	}
 
-	// Clear buffer region
-	for (int i=0; i<width*height; i++){
-		mvaddch(i/width, i%width, ' ');
-	}
-
 	// Print ASCII to screen
 	for (int i=0; i<newBytes; i++){
 		mvaddch(y+i/width, x+i%width, stripped[i]);
