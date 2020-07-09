@@ -163,8 +163,8 @@ void generateSubs(char **frame){
 	if (vStream.time >= start && vStream.time < end){
 
 		// Total display width is a function of character size
-		int width = vStream.width/CHAR_X;
-		int height = vStream.height/CHAR_Y;
+		int width = (vStream.width/CHAR_X)/vStream.render_scale;
+		int height = (vStream.height/CHAR_Y)/vStream.render_scale;
 
 		// Calculate bounding box for our subtitles
 		int tBox_X = MAX_CHAR+2, tBox_Y = NUM_ROWS+2;
