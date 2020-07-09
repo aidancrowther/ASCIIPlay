@@ -20,6 +20,26 @@ uint8_t* grayscale(AVFrame *pFrame, int width, int height){
 	return img;
 }
 
+void resizeFrame(uint8_t *img, int width, int height){
+	int pixel = 0;
+	int count = 0;
+
+	for(int j=0; j<height; j+=vStream.render_scale){
+		for(int i=0; i<width; i+=vStream.render_scale){
+			pixel = 0;
+			count = 0;
+			for(int k=0; k<(vStream.render_scale*vStream.render_scale); k++){
+				if(!(i+(k%vStream.render_scale) >= width || j+(k/vStream.render_scale) >= height)){
+					pixel += *(img+(i+(k%vStream.render_scale))+(j+(k/vStream.render_scale))*width);
+					count++;
+				}
+			}
+			*(img+(i/vStream.render_scale)+(j/vStream.render_scale)*(width/vStream.render_scale)) = pixel/count;
+		}
+	}
+
+}
+
 int getNiceFramerate(double framerate){
 	int multiplier = 1;
 	while(ceil(framerate*multiplier) != floor(framerate*multiplier)) multiplier *= 10;
@@ -69,21 +89,4 @@ int timeval_subtract (result, x, y)
 
   /* Return 1 if result is negative. */
   return x->tv_sec < y->tv_sec;
-}
-
-uint8_t* reduceFrame(uint8_t *src, int width, int height, int factor){
-	
-	uint8_t *img = malloc(sizeof(uint8_t) * (width)*(height));
-
-	for (int y=0; y<height/factor; y++){
-		for (int x=0; x<width/factor; x++){
-			for(int z=0; z<factor*factor; z++){
-				*(img+x+(y*(height/factor))) += *(src+(x*factor)+(y*width)+(z%factor)+(y*width)*(z/factor));
-			}
-			*(img+x+(y*(height/factor))) /= factor*factor;
-		}
-	}
-
-	return &img;
-
 }

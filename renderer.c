@@ -5,7 +5,33 @@ void renderFrame(uint8_t *img, int width, int height) {
 
 	unsigned char *zText;
 	unsigned int nBytes;
-	
+
+	int x = 0, y = 0;
+	getmaxyx(stdscr, y, x);
+
+	int scr_x = x, scr_y = y;
+
+	if(vStream.scr_width == 0 && vStream.scr_height == 0){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+	} else if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+
+		// Clear buffer region
+		clear();
+
+		int scale = 1;
+		while((width/CHAR_X)/scale > scr_x || (height/CHAR_Y)/scale > scr_y) scale++;
+		vStream.render_scale = scale;
+	}
+
+	if(vStream.render_scale > 1){
+		resizeFrame(img, width, height);
+	}
+
+	width = width/vStream.render_scale, height = height/vStream.render_scale;
+
 	AsciiArtInit(&sRender);
 
 	// Allocate space for ascii frame
@@ -18,24 +44,8 @@ void renderFrame(uint8_t *img, int width, int height) {
 	// Generate subtitles
 	if(vStream.subFile != NULL) generateSubs(&zText);
 
-	int x = 0, y = 0;
-	getmaxyx(stdscr, y, x);
-
-	int scr_x = x, scr_y = y;
-
 	width = width/CHAR_X;
 	height = height/CHAR_Y;
-
-	if(vStream.scr_width == 0 && vStream.scr_height == 0){
-		vStream.scr_width = scr_x;
-		vStream.scr_height = scr_y;
-	} else if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
-		vStream.scr_width = scr_x;
-		vStream.scr_height = scr_y;
-
-		// Clear buffer region
-		clear();
-	}
 
 	// Determine our text offset to center the screen
 	x = (x-width)/2;
@@ -64,12 +74,14 @@ void renderFrame(uint8_t *img, int width, int height) {
 		char *nextSubEnd[MAX_CHAR];
 		char *nextSubLine[MAX_CHAR];
 		char *windowSize[20];
+		char *rendererSize[MAX_CHAR];
 		sprintf(timecode, "Time: %f", vStream.time);
 		sprintf(realtime, "Time: %f", vStream.realTime);
 		sprintf(nextSubStart, "Next sub: %f", *(vStream.subTimes+vStream.subPos*3+0));
 		sprintf(nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
 		sprintf(nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
 		sprintf(windowSize, "Width: %d Height: %d", scr_x, scr_y);
+		sprintf(rendererSize, "R_Width: %d R_Height: %d Scale: %d", width, height, vStream.render_scale);
 		for (int i=0; i<newBytes; i++){
 			if(i%width < strlen(timecode) && i/width == 0) mvprintw(y, x, timecode);
 			if(i%width < strlen(realtime) && i/width == 1) mvprintw(y+1, x, realtime);
@@ -77,6 +89,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 			if(i%width < strlen(nextSubEnd) && i/width == 3) mvprintw(y+3, x, nextSubEnd);
 			if(i%width < strlen(nextSubLine) && i/width == 4) mvprintw(y+4, x, nextSubLine);
 			if(i%width < strlen(windowSize) && i/width == 5) mvprintw(y+5, x, windowSize);
+			if(i%width < strlen(rendererSize) && i/width == 6) mvprintw(y+6, x, rendererSize);
 		}
 	}
 

@@ -33,6 +33,7 @@ struct videoStream {
 	int scr_width;
 	int height;
 	int scr_height;
+	int render_scale;
 	double time;
 	double realTime;
 	int frameCount;

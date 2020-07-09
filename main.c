@@ -302,6 +302,7 @@ int main(int argc, char *argv[]){
 	vStream.fpPos = 0;
 	vStream.subPos = 0;
 	vStream.fps = 0.0;
+	vStream.render_scale = 1;
 
 	// Setup thread tracking
 	pthread_t threads[NUM_THREADS];
