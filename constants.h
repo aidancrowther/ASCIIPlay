@@ -30,7 +30,9 @@ struct videoStream {
 	double fps;
 	double srcFps;
 	int width;
+	int scr_width;
 	int height;
+	int scr_height;
 	double time;
 	double realTime;
 	int frameCount;

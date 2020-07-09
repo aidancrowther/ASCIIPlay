@@ -21,8 +21,21 @@ void renderFrame(uint8_t *img, int width, int height) {
 	int x = 0, y = 0;
 	getmaxyx(stdscr, y, x);
 
+	int scr_x = x, scr_y = y;
+
 	width = width/CHAR_X;
 	height = height/CHAR_Y;
+
+	if(vStream.scr_width == 0 && vStream.scr_height == 0){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+	} else if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+
+		// Clear buffer region
+		clear();
+	}
 
 	// Determine our text offset to center the screen
 	x = (x-width)/2;
@@ -50,17 +63,20 @@ void renderFrame(uint8_t *img, int width, int height) {
 		char *nextSubStart[MAX_CHAR];
 		char *nextSubEnd[MAX_CHAR];
 		char *nextSubLine[MAX_CHAR];
+		char *windowSize[20];
 		sprintf(timecode, "Time: %f", vStream.time);
 		sprintf(realtime, "Time: %f", vStream.realTime);
 		sprintf(nextSubStart, "Next sub: %f", *(vStream.subTimes+vStream.subPos*3+0));
 		sprintf(nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
 		sprintf(nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
+		sprintf(windowSize, "Width: %d Height: %d", scr_x, scr_y);
 		for (int i=0; i<newBytes; i++){
 			if(i%width < strlen(timecode) && i/width == 0) mvprintw(y, x, timecode);
 			if(i%width < strlen(realtime) && i/width == 1) mvprintw(y+1, x, realtime);
 			if(i%width < strlen(nextSubStart) && i/width == 2) mvprintw(y+2, x, nextSubStart);
 			if(i%width < strlen(nextSubEnd) && i/width == 3) mvprintw(y+3, x, nextSubEnd);
 			if(i%width < strlen(nextSubLine) && i/width == 4) mvprintw(y+4, x, nextSubLine);
+			if(i%width < strlen(windowSize) && i/width == 5) mvprintw(y+5, x, windowSize);
 		}
 	}
 
