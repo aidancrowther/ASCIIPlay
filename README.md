@@ -24,19 +24,19 @@ Status:
 Roadmap:
 
    - [x] Load and read video files
-   - [x] Render ASCII representation
-   - [x] Implement frame buffer
-   - [x] Make use of threading
+      - [x] Render ASCII representation
+      - [ ] Use custom ASCII renderer to remove closed source dependencies
+      - [ ] Colour support
+      - [ ] Audio renderer
    - [x] Add subtitle support
+      - [ ] More subtitle filetypes
+      - [ ] Alternate subtitle rendering modes
    - [x] Performance improvements
-   - [x] framerate limiting
-   - [ ] Use custom ASCII renderer to remove closed source dependencies
-   - [ ] More subtitle filetypes
-   - [ ] Alternate subtitle rendering modes
+      - [x] framerate limiting
+      - [x] Implement frame buffer
+      - [x] Make use of threading
    - [x] Improve error reporting
    - [ ] Auto Installer
-   - [ ] Colour support
-   - [ ] Audio renderer
    - [x] Support Resizing
       - [ ] Improve Resizing
    
