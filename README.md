@@ -37,6 +37,7 @@ Roadmap:
    - [ ] Auto Installer
    - [ ] Colour support
    - [ ] Audio renderer
+   - [ ] Support Resizing
    
 Requirements:
 
