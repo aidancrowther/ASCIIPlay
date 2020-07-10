@@ -6,11 +6,13 @@ void renderFrame(uint8_t *img, int width, int height) {
 	unsigned char *zText;
 	unsigned int nBytes;
 
+	// Get rendering dimensions
 	int x = 0, y = 0;
 	getmaxyx(stdscr, y, x);
 
 	int scr_x = x, scr_y = y;
 
+	// Update our scaling if needed
 	if(vStream.scr_width == 0 && vStream.scr_height == 0){
 		vStream.scr_width = width/CHAR_X;
 		vStream.scr_height = height/CHAR_Y;
@@ -21,16 +23,28 @@ void renderFrame(uint8_t *img, int width, int height) {
 		// Clear buffer region
 		clear();
 
-		int scale = 1;
-		while((width/CHAR_X)/scale > scr_x || (height/CHAR_Y)/scale > scr_y) scale++;
-		vStream.render_scale = scale;
+		// Determine the minimum x scaling factor
+		int scale_x = 0;
+		while((width/CHAR_X) - scale_x > scr_x) scale_x++;
+
+		// Determine the minimum y scaling factor
+		int scale_y = 0;
+		while((height/CHAR_Y) - scale_y > scr_y) scale_y++;
+
+		// Modify our scaling factors as needed to maintain aspect ratio
+		while((double)scale_x/(double)scale_y > (double)vStream.width/(double)vStream.height) scale_y++;
+		while((double)scale_y/(double)scale_x > (double)vStream.height/(double)vStream.width) scale_x++;
+
+		vStream.scale_x = scale_x;
+		vStream.scale_y = scale_y;
 	}
 
-	if(vStream.render_scale > 1){
+	//If scaling is needed call the scaler
+	if(vStream.scale_x > 0 && vStream.scale_y > 0){
 		resizeFrame(img, width, height);
 	}
 
-	width = width/vStream.render_scale, height = height/vStream.render_scale;
+	width = width - vStream.scale_x*CHAR_X, height = height - vStream.scale_y*CHAR_Y;
 
 	AsciiArtInit(&sRender);
 
@@ -81,7 +95,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 		sprintf(nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
 		sprintf(nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
 		sprintf(windowSize, "Width: %d Height: %d", scr_x, scr_y);
-		sprintf(rendererSize, "R_Width: %d R_Height: %d Scale: %d", width, height, vStream.render_scale);
+		sprintf(rendererSize, "R_Width: %d R_Height: %d Scale_X: %d Scale_Y: %d", width, height, vStream.scale_x, vStream.scale_y);
 		for (int i=0; i<newBytes; i++){
 			if(i%width < strlen(timecode) && i/width == 0) mvprintw(y, x, timecode);
 			if(i%width < strlen(realtime) && i/width == 1) mvprintw(y+1, x, realtime);
@@ -163,8 +177,8 @@ void generateSubs(char **frame){
 	if (vStream.time >= start && vStream.time < end){
 
 		// Total display width is a function of character size
-		int width = (vStream.width/CHAR_X)/vStream.render_scale;
-		int height = (vStream.height/CHAR_Y)/vStream.render_scale;
+		int width = (vStream.width/CHAR_X) - vStream.scale_x*CHAR_X;
+		int height = (vStream.height/CHAR_Y) - vStream.scale_y*CHAR_Y;
 
 		// Calculate bounding box for our subtitles
 		int tBox_X = MAX_CHAR+2, tBox_Y = NUM_ROWS+2;

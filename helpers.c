@@ -24,17 +24,19 @@ void resizeFrame(uint8_t *img, int width, int height){
 	int pixel = 0;
 	int count = 0;
 
-	for(int j=0; j<height; j+=vStream.render_scale){
-		for(int i=0; i<width; i+=vStream.render_scale){
-			pixel = 0;
-			count = 0;
-			for(int k=0; k<(vStream.render_scale*vStream.render_scale); k++){
-				if(!(i+(k%vStream.render_scale) >= width || j+(k/vStream.render_scale) >= height)){
-					pixel += *(img+(i+(k%vStream.render_scale))+(j+(k/vStream.render_scale))*width);
-					count++;
-				}
+	int skip_x = width/vStream.scale_x*CHAR_X;
+	int skip_y = height/vStream.scale_y*CHAR_Y;
+
+	int new_width = width - vStream.scale_x*CHAR_X;
+	int new_height = height - vStream.scale_y*CHAR_Y;
+
+	for(int j=0; j<height; j++){
+		for(int i=0; i<width; i++){
+			if(count%new_width != 0){
+				if(j%skip_y == 0 || i%skip_x == 0) continue;
+				if(i >= new_width || j >= new_height) continue;
 			}
-			*(img+(i/vStream.render_scale)+(j/vStream.render_scale)*(width/vStream.render_scale)) = pixel/count;
+			*(img+(count++)) = *(img+i+j*width);
 		}
 	}
 
