@@ -21,21 +21,26 @@ uint8_t* grayscale(AVFrame *pFrame, int width, int height){
 }
 
 void resizeFrame(uint8_t *img, int width, int height){
-	int pixel = 0;
 	int count = 0;
 
+	// Determine the interval at which we need to drop lines
 	int skip_x = width/vStream.scale_x*CHAR_X;
 	int skip_y = height/vStream.scale_y*CHAR_Y;
 
+	// The destination dimensions of our array
 	int new_width = width - vStream.scale_x*CHAR_X;
 	int new_height = height - vStream.scale_y*CHAR_Y;
 
+	// Iterate over the entire input array
 	for(int j=0; j<height; j++){
 		for(int i=0; i<width; i++){
+			// As long as we aren't at the end of our curent working row
 			if(count%new_width != 0){
+				// Skip lines on x and y axes as needed by skipping this loop iteration
 				if(j%skip_y == 0 || i%skip_x == 0) continue;
 				if(i >= new_width || j >= new_height) continue;
 			}
+			// Set the current image value to our current location
 			*(img+(count++)) = *(img+i+j*width);
 		}
 	}
