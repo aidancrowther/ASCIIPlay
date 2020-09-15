@@ -47,7 +47,7 @@ Requirements:
 Install:
 
    - Download repository
-     `git clone https://github.com/aidancrowther/Odysseus`
+     `git clone https://github.com/aidancrowther/ASCIIPlay`
      
    - Navigate to ASCIIPlay folder and prepare Makefile
      `cmake .`
@@ -66,7 +66,7 @@ Usage:
    - __--slow-mode__: Allow slower systems time to start reading the input file
    - __--frame-rate__: Specify a framerate (>1 && < src framerate) to render at
    - __--no-render__: Disable the renderer output (Don't recommend using this if you want to see anything)
-   - __--enable-skew__: Disable frametime skew correction (for testing purposes only)
+   - __--enable-skew__: Disable frametime skew correction (Don't use this if you want subs to do anything useful)
    - __--debug__: Display debug information while rendering
       
 Problems:
