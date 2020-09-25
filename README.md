@@ -35,10 +35,14 @@ Roadmap:
       - [x] framerate limiting
       - [x] Implement frame buffer
       - [x] Make use of threading
-   - [x] Improve error reporting
-   - [ ] Auto Installer
    - [x] Support Resizing
       - [ ] Improve Resizing
+   - [ ] Add control features
+      - [x] Play/Pause
+      - [x] Fast Forward (Improve this)
+      - [ ] Rewind
+   - [x] Improve error reporting
+   - [ ] Auto Installer
    
 Requirements:
 
