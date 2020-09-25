@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
 project( telnetflix )
 include_directories( Lib )
-add_executable( telnetflix main.c helpers.c Lib/ascii_art.c renderer.c )
+add_executable( telnetflix main.c helpers.c Lib/ascii_art.c renderer.c controller.c )
 target_link_libraries( telnetflix -I ./include -L./lib -lavformat -lavcodec -lswscale -lavutil -lswresample -lz -lm -lpthread -lcurses)

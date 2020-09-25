@@ -243,6 +243,9 @@ void *renderingEngine(struct vBuffer *buffer){
 	// Run until we hit the streamEnd frame
 	while(1){
 
+		// Do not render when paused (sleep thread to not spin it)
+		while(controls.pause) sleep(0.1);
+
 		// Thread may be ready before the frames are, so wait for frames
 		while(vStream.bufferLength <= 0) nanosleep(&wait, (struct timespec*) NULL);
 
@@ -253,7 +256,8 @@ void *renderingEngine(struct vBuffer *buffer){
 		timeval_subtract(&diff, &curr, &start);
 
 		// If enough time has passed between the last frame and this one render it
-		if (diff.tv_usec >= (1/vStream.fps*1000000)){
+		// Alternatively, if we are fast forwarding loading frames as they come into the buffer
+		if (diff.tv_usec >= (1/vStream.fps*1000000) || controls.fast_forward){
 			// Update our timing variable
 			gettimeofday(&start, 0x0);
 			// Pull the new frame data from the buffer
@@ -267,15 +271,18 @@ void *renderingEngine(struct vBuffer *buffer){
 			// Pass frame data to renderer
 			renderFrame(buffer->frame, vStream.width, vStream.height);
 
-			if(buffer->next == NULL) break;
+			if (buffer->next == NULL) break;
+
 		}
 
 		nanosleep(&wait, (struct timespec*) NULL);
 	}
 
+	// Close the subtitle file
+	if (vStream.subFile != NULL) fclose(subFile);
+
 	// Free memory
 	free(buffer);
-	fclose(subFile);
 	pthread_exit(0);
 }
 
@@ -287,6 +294,10 @@ int main(int argc, char *argv[]){
 	char* flag;
 	int slowMode = 0;
 	int disableRenderer = 0;
+
+	// Initialize our control structure
+	controls.pause = false;
+	controls.fast_forward = false;
 
 	wait.tv_nsec = 1000000;
 
@@ -371,13 +382,13 @@ int main(int argc, char *argv[]){
 	pthread_create(&threads[0], NULL, openStream, vArgs);
 	if (slowMode) sleep(4);
 	pthread_create(&threads[1], NULL, renderingEngine, videoBuffer);
+	pthread_create(&threads[2], NULL, inputHandler, NULL);
 	pthread_join(threads[0], NULL);
 	pthread_join(threads[1], NULL);
+	pthread_cancel(threads[2]);
 
 	// Free allocated memory
 	free(vArgs);
-	free(filename);
-	free(subfile);
 	if(vStream.subTimes != NULL) free(vStream.subTimes);
 
 	// Terminate our screen

@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "helpers.h"
 #include "renderer.h"
+#include "controller.h"
 
 // Open up the file data stream and parse frames
 void openStream(struct vStreamArgs* args);

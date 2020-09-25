@@ -27,13 +27,19 @@ void renderFrame(uint8_t *img, int width, int height) {
 		int scale_x = 0;
 		while((width/CHAR_X) - scale_x > scr_x) scale_x++;
 
+		// Use nice whole integer scaling for now, not terribly robust sadly
+		while(scale_x != 0 && width%(scale_x*CHAR_X) != 0) scale_x++;
+		int scale_y = ceil(((double)height * (double)scale_x) / (double) width);
+
+		// This code is slightly better for scaling, however it is too complicated for me to figure out right now
+
 		// Determine the minimum y scaling factor
-		int scale_y = 0;
-		while((height/CHAR_Y) - scale_y > scr_y) scale_y++;
+		//int scale_y = 0;
+		//while((height/CHAR_Y) - scale_y > scr_y) scale_y++;
 
 		// Modify our scaling factors as needed to maintain aspect ratio
-		while((double)scale_x/(double)scale_y > (double)vStream.width/(double)vStream.height) scale_y++;
-		while((double)scale_y/(double)scale_x > (double)vStream.height/(double)vStream.width) scale_x++;
+		//while((double)scale_x/(double)scale_y > (double)vStream.width/(double)vStream.height) scale_y++;
+		//while((double)scale_y/(double)scale_x > (double)vStream.height/(double)vStream.width) scale_x++;
 
 		vStream.scale_x = scale_x;
 		vStream.scale_y = scale_y;
@@ -91,9 +97,11 @@ void renderFrame(uint8_t *img, int width, int height) {
 		char *rendererSize[MAX_CHAR];
 		sprintf(timecode, "Time: %f", vStream.time);
 		sprintf(realtime, "Time: %f", vStream.realTime);
-		sprintf(nextSubStart, "Next sub: %f", *(vStream.subTimes+vStream.subPos*3+0));
-		sprintf(nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
-		sprintf(nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
+		if (vStream.subFile != NULL){ 
+			sprintf(nextSubStart, "Next sub: %f", *(vStream.subTimes+vStream.subPos*3+0));
+			sprintf(nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
+			sprintf(nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
+		}
 		sprintf(windowSize, "Width: %d Height: %d", scr_x, scr_y);
 		sprintf(rendererSize, "R_Width: %d R_Height: %d Scale_X: %d Scale_Y: %d", width, height, vStream.scale_x, vStream.scale_y);
 		for (int i=0; i<newBytes; i++){
