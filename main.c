@@ -77,7 +77,7 @@ void openStream(struct vStreamArgs* args){
 	int numBytes;
 	uint8_t *buffer = NULL;
 
-	numBytes = avpicture_get_size(AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height);
+	numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height, ALIGNMENT);
 	buffer = (uint8_t *)av_malloc(numBytes*sizeof(uint8_t));
 
 	avpicture_fill((AVPicture *)pFrameRGB, buffer, AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height);

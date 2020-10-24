@@ -1,6 +1,7 @@
 #ifndef CONSTANTS
 #define CONSTANTS
 
+#define ALIGNMENT 32
 #define MAX_BUFFER 100
 #define MAX_CHAR 50
 #define NUM_ROWS 2
@@ -20,6 +21,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
+#include <libavutil/imgutils.h>
 #include <pthread.h>
 #include <sys/time.h>
 #include <ncurses.h>
