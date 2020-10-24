@@ -12,4 +12,7 @@ void prepSubs(char *str);
 // Superimpose subtitles over the generated ASCII
 void generateSubs(char **frame);
 
+// Resize a given frame by the specified scale factor
+void resizeFrame(uint8_t *img, int width, int height);
+
 #endif

@@ -62,7 +62,7 @@ void renderFrame(uint8_t *img, int width, int height) {
 	AsciiArtRender(&sRender, img, &width, &height, zText, 1);
 
 	// Generate subtitles
-	if(vStream.subFile != NULL) generateSubs(&zText);
+	if(vStream.subFile != NULL) generateSubs((char **)&zText);
 
 	width = width/CHAR_X;
 	height = height/CHAR_Y;
@@ -95,23 +95,23 @@ void renderFrame(uint8_t *img, int width, int height) {
 		char *nextSubLine[MAX_CHAR];
 		char *windowSize[20];
 		char *rendererSize[MAX_CHAR];
-		sprintf(timecode, "Time: %f", vStream.time);
-		sprintf(realtime, "Time: %f", vStream.realTime);
+		sprintf((char *)timecode, "Time: %f", vStream.time);
+		sprintf((char *)realtime, "Time: %f", vStream.realTime);
 		if (vStream.subFile != NULL){ 
-			sprintf(nextSubStart, "Next sub: %f", *(vStream.subTimes+vStream.subPos*3+0));
-			sprintf(nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
-			sprintf(nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
+			sprintf((char *)nextSubStart, "Next sub: %f", *(vStream.subTimes+vStream.subPos*3+0));
+			sprintf((char *)nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
+			sprintf((char *)nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
 		}
-		sprintf(windowSize, "Width: %d Height: %d", scr_x, scr_y);
-		sprintf(rendererSize, "R_Width: %d R_Height: %d Scale_X: %d Scale_Y: %d", width, height, vStream.scale_x, vStream.scale_y);
+		sprintf((char *)windowSize, "Width: %d Height: %d", scr_x, scr_y);
+		sprintf((char *)rendererSize, "R_Width: %d R_Height: %d Scale_X: %d Scale_Y: %d", width, height, vStream.scale_x, vStream.scale_y);
 		for (int i=0; i<newBytes; i++){
-			if(i%width < strlen(timecode) && i/width == 0) mvprintw(y, x, timecode);
-			if(i%width < strlen(realtime) && i/width == 1) mvprintw(y+1, x, realtime);
-			if(i%width < strlen(nextSubStart) && i/width == 2) mvprintw(y+2, x, nextSubStart);
-			if(i%width < strlen(nextSubEnd) && i/width == 3) mvprintw(y+3, x, nextSubEnd);
-			if(i%width < strlen(nextSubLine) && i/width == 4) mvprintw(y+4, x, nextSubLine);
-			if(i%width < strlen(windowSize) && i/width == 5) mvprintw(y+5, x, windowSize);
-			if(i%width < strlen(rendererSize) && i/width == 6) mvprintw(y+6, x, rendererSize);
+			if(i%width < strlen((const char *)timecode) && i/width == 0) mvprintw(y, x, (const char *)timecode);
+			if(i%width < strlen((const char *)realtime) && i/width == 1) mvprintw(y+1, x, (const char *)realtime);
+			if(i%width < strlen((const char *)nextSubStart) && i/width == 2) mvprintw(y+2, x, (const char *)nextSubStart);
+			if(i%width < strlen((const char *)nextSubEnd) && i/width == 3) mvprintw(y+3, x, (const char *)nextSubEnd);
+			if(i%width < strlen((const char *)nextSubLine) && i/width == 4) mvprintw(y+4, x, (const char *)nextSubLine);
+			if(i%width < strlen((const char *)windowSize) && i/width == 5) mvprintw(y+5, x, (const char *)windowSize);
+			if(i%width < strlen((const char *)rendererSize) && i/width == 6) mvprintw(y+6, x, (const char *)rendererSize);
 		}
 	}
 

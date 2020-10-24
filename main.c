@@ -24,11 +24,11 @@ void openStream(struct vStreamArgs* args){
 
 	// Open video file
 	if(avformat_open_input(&pFormatCtx, filename, NULL, NULL) != 0)
-		pthread_exit(1); // Couldn't open file
+		pthread_exit((void *)1); // Couldn't open file
 
 	//Get stream info
 	if(avformat_find_stream_info(pFormatCtx, NULL) < 0)
-  		pthread_exit(2); // Couldn't find stream information
+  		pthread_exit((void *)2); // Couldn't find stream information
 	
 	// Find first video stream
 	int i = 0;
@@ -54,24 +54,24 @@ void openStream(struct vStreamArgs* args){
 	vStream.height = pFormatCtx->streams[stream]->codecpar->height;
 	vStream.width = pFormatCtx->streams[stream]->codecpar->width*2;
 
-	if (stream == -1) pthread_exit(3); // No video streams found
+	if (stream == -1) pthread_exit((void *)3); // No video streams found
 
 	//Try to find the video codec
 	pCodec = avcodec_find_decoder(pFormatCtx->streams[stream]->codecpar->codec_id);
-	if (pCodec == NULL) pthread_exit(4); // Unsupported codec
+	if (pCodec == NULL) pthread_exit((void *)4); // Unsupported codec
 
 	// Copy the found codec
 	pCodecCtx = avcodec_alloc_context3(pCodec);
 
 	// Copy codec parameters and open the context
 	avcodec_parameters_to_context(pCodecCtx, pFormatCtx->streams[stream]->codecpar);
-	if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) pthread_exit(5); //Could not open codec
+	if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) pthread_exit((void *)5); //Could not open codec
 
 	// Alocate a frame
 	pFrame = av_frame_alloc();
 	pFrameRGB = av_frame_alloc();
-	if (pFrame == NULL) pthread_exit(6); //Could not allocate AVFrame
-	if (pFrameRGB == NULL) pthread_exit(7);
+	if (pFrame == NULL) pthread_exit((void *)6); //Could not allocate AVFrame
+	if (pFrameRGB == NULL) pthread_exit((void *)7);
 
 	// Prepare a buffer for frame conversion
 	int numBytes;
@@ -140,7 +140,7 @@ void openStream(struct vStreamArgs* args){
 	// Close the video file
 	avformat_close_input(&pFormatCtx);
 
-	pthread_exit(0);
+	pthread_exit((void *)0);
 }
 
 // Write new frame data to the tail of the buffer queue
@@ -170,7 +170,7 @@ void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
 }
 
 // Return frame buffer at the head of our queue
-struct vBuffer** readBuffer(struct vBuffer **buffer){
+struct vBuffer* readBuffer(struct vBuffer **buffer){
 	struct vBuffer *nextBuffer;
 
 	// Wait for the semaphore so we don't cause any issues
@@ -283,7 +283,7 @@ void *renderingEngine(struct vBuffer *buffer){
 
 	// Free memory
 	free(buffer);
-	pthread_exit(0);
+	pthread_exit((void *)0);
 }
 
 // Spawn all neccessary threads and manage them
@@ -379,9 +379,9 @@ int main(int argc, char *argv[]){
 	vArgs->buffer = videoBuffer;
 
 	// Create and track our threads
-	pthread_create(&threads[0], NULL, openStream, vArgs);
+	pthread_create(&threads[0], NULL, (void * (*)(void *))openStream, vArgs);
 	if (slowMode) sleep(4);
-	pthread_create(&threads[1], NULL, renderingEngine, videoBuffer);
+	pthread_create(&threads[1], NULL, (void * (*)(void *))renderingEngine, videoBuffer);
 	pthread_create(&threads[2], NULL, inputHandler, NULL);
 	pthread_join(threads[0], NULL);
 	pthread_join(threads[1], NULL);
