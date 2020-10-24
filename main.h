@@ -16,7 +16,7 @@ void loadSubs();
 void writeBuffer(struct vBuffer **buffer, AVFrame *frame);
 
 // Return frame buffer at the head of our queue
-struct vBuffer** readBuffer(struct vBuffer **buffer);
+struct vBuffer* readBuffer(struct vBuffer **buffer);
 
 // Run continuously in the background rendering frames when needed
 void *renderingEngine(struct vBuffer *buffer);
