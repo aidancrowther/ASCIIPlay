@@ -1,58 +1,19 @@
 #include "helpers.h"
 
 // Convert an AVFrame to a B/W image
-uint8_t* grayscale(AVFrame *pFrame, int width, int height){
+uint8_t* addPadding(AVFrame *pFrame, int width, int height){
+
 	uint8_t *img = (uint8_t*) malloc(width*height * sizeof(uint8_t*));
-	uint8_t pixel[NUM_CHANNELS];
 
 	// Iterate over the frame buffer
 	for(int y = 0; y < height; y++){
-		for(int x = 0; x < width*3; x += 3){
-			for(int channel=0; channel < NUM_CHANNELS; channel++){
-				// Capture pixel data for each channel
-				pixel[channel] = *(pFrame->data[0]+y*(pFrame->linesize[0])+(x/2)+channel);
-			}
+		for(int x = 0; x < width; x++){
 			// Convert the three channels to a grayscale representation
-			*(img+(x/3)+y*width) = (pixel[R] + pixel[G] + pixel[B])/NUM_CHANNELS;
+			*(img+x+y*width) = *(pFrame->data[0]+y*(pFrame->linesize[0])+(x/2));
 		}
 	}
 
 	return img;
-}
-
-void resizeFrame(uint8_t *img, int width, int height){
-	// The destination dimensions of our array
-	int new_width = width - vStream.scale_x*CHAR_X;
-	int new_height = height - vStream.scale_y*CHAR_Y;
-	
-	// Determine the interval at which we need to drop lines
-	int skip_x = width / (width - new_width);
-	int skip_y = height / (height - new_height);
-
-	int loc = 0;
-
-	// Scale y axis to the new dimensions
-	for(int j=0; j<height; j++){
-		if(j%skip_y == 0){
-			loc++;
-			continue;
-		}
-		for(int i=0; i<width; i++){
-			*(img+(i+(j-loc)*width)) = *(img+(i+j*width));
-		}
-	}
-
-	loc = 0;
-
-	// Scale x axis to the new dimensions
-	for(int i=0; i<(height*width); i++){
-		if(i%skip_x == 0){
-			loc++;
-			continue;
-		}
-		*(img+(i-loc)) = *(img+(i));
-	}
-
 }
 
 int getNiceFramerate(double framerate){
@@ -104,4 +65,52 @@ int timeval_subtract (result, x, y)
 
   /* Return 1 if result is negative. */
   return x->tv_sec < y->tv_sec;
+}
+
+void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
+  FILE *pFile;
+  char szFilename[32];
+  int  y;
+  
+  // Open file
+  sprintf(szFilename, "temp/frame%d.ppm", iFrame);
+  pFile=fopen(szFilename, "wb");
+  if(pFile==NULL)
+    return;
+  
+  // Write header
+  fprintf(pFile, "P6\n%d %d\n255\n", width, height);
+  
+  // Write pixel data
+  for(y=0; y<height; y++)
+    fwrite(pFrame->data[0]+y*pFrame->linesize[0], 1, width*3, pFile);
+  
+  // Close file
+  fclose(pFile);
+}
+
+void updateFrameDimensions(){
+    // Get rendering dimensions
+	int x = 0, y = 0;
+	getmaxyx(stdscr, y, x);
+
+	int scr_x = x, scr_y = y;
+
+	// Update our scaling if needed
+	if(vStream.width == 0 && vStream.height == 0){
+		vStream.height=y*CHAR_Y;
+		vStream.width=x*CHAR_X;
+		vStream.scr_width = vStream.width/CHAR_X;
+		vStream.scr_height = vStream.height/CHAR_Y;
+	} else if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+		vStream.height=y*CHAR_Y;
+		vStream.width=x*CHAR_X;
+
+		vStream.resized = true;
+
+		// Clear buffer region
+		clear();
+	}
 }

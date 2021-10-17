@@ -5,3 +5,7 @@ cmake_install.cmake
 *.mp4
 shrek
 *.o
+Lib/
+*.srt
+*.txt
+telnetflix

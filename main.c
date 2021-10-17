@@ -51,8 +51,6 @@ void openStream(struct vStreamArgs* args){
 		frameAdjustment = getNiceFramerate(enableFramePacing);
 		vStream.srcFps = enableFramePacing;
 	}
-	vStream.height = pFormatCtx->streams[stream]->codecpar->height;
-	vStream.width = pFormatCtx->streams[stream]->codecpar->width*2;
 
 	if (stream == -1) pthread_exit((void *)3); // No video streams found
 
@@ -77,21 +75,24 @@ void openStream(struct vStreamArgs* args){
 	int numBytes;
 	uint8_t *buffer = NULL;
 
-	numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height, ALIGNMENT);
+	numBytes = av_image_get_buffer_size(AV_PIX_FMT_GRAY8, pCodecCtx->width, pCodecCtx->height, ALIGNMENT);
 	buffer = (uint8_t *)av_malloc(numBytes*sizeof(uint8_t));
 
-	avpicture_fill((AVPicture *)pFrameRGB, buffer, AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height);
+	avpicture_fill((AVPicture *)pFrameRGB, buffer, AV_PIX_FMT_GRAY8, pCodecCtx->width, pCodecCtx->height);
 
 	struct SwsContext *sws_ctx = NULL;
 	int frameFinished;
 	AVPacket packet;
 
+	vStream.vWidth = pCodecCtx->width;
+	vStream.vHeight = pCodecCtx->height;
+
 	sws_ctx = sws_getContext(pCodecCtx->width,
 		pCodecCtx->height,
 		pCodecCtx->pix_fmt,
-		pCodecCtx->width,
-		pCodecCtx->height,
-		AV_PIX_FMT_RGB24,
+		vStream.width/2,
+		vStream.height,
+		AV_PIX_FMT_GRAY8,
 		SWS_BILINEAR,
 		NULL,
 		NULL,
@@ -99,6 +100,22 @@ void openStream(struct vStreamArgs* args){
 	);
 
 	for(int frame=0; av_read_frame(pFormatCtx, &packet) >= 0; frame++){
+
+		if(vStream.resized = true){
+			sws_ctx = sws_getContext(pCodecCtx->width,
+				pCodecCtx->height,
+				pCodecCtx->pix_fmt,
+				vStream.width/2,
+				vStream.height,
+				AV_PIX_FMT_GRAY8,
+				SWS_BILINEAR,
+				NULL,
+				NULL,
+				NULL
+			);
+			vStream.resized = false;
+		}
+
 		// Check that the packet is from our stream
 		if (packet.stream_index == stream){
 			// Decode frame
@@ -126,6 +143,8 @@ void openStream(struct vStreamArgs* args){
 		av_free_packet(&packet);
 	}
 
+	vStream.bufferEnd = true;
+
 	// Free the RGB image
 	av_free(buffer);
 	//writeBuffer(videoBuffer, pFrameRGB, 1);
@@ -148,18 +167,19 @@ void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
 	struct vBuffer *newBuffer;
 
 	// Wait for the semaphore
-	while (vStream.semaphore != 0) nanosleep(&wait, (struct timespec*) NULL);;
+	while (vStream.semaphore != 0) nanosleep(&wait, (struct timespec*) NULL);
 	vStream.semaphore = 1;
 
 	// Find the ned of the buffer
 	while ((*buffer)->next != NULL) (*buffer) = (*buffer)->next;
 	// Allocate the buffer
 	(*buffer)->next = (struct vBuffer*) malloc(sizeof(struct videoBuffer*)+sizeof(uint8_t*) * vStream.width*vStream.height);
-	
+
 	// Handle the NULL head frame buffer
 	if (frame != NULL){
-		// Convert frame data to a grayscale represenation and store it
-		(*buffer)->next->frame = grayscale(frame, vStream.width, vStream.height);
+		// Pad frame data and store it
+		(*buffer)->next->frame = addPadding(frame, vStream.width, vStream.height);
+
 	}
 
 	// Update frame buffer
@@ -174,7 +194,7 @@ struct vBuffer* readBuffer(struct vBuffer **buffer){
 	struct vBuffer *nextBuffer;
 
 	// Wait for the semaphore so we don't cause any issues
-	while (vStream.semaphore != 0) nanosleep(&wait, (struct timespec*) NULL);;
+	while (vStream.semaphore != 0 || (vStream.bufferLength <= 2 && !vStream.bufferEnd)) nanosleep(&wait, (struct timespec*) NULL);
 	vStream.semaphore = 1;
 
 	// Update buffer and queue
@@ -269,7 +289,7 @@ void *renderingEngine(struct vBuffer *buffer){
 			if (!skew && (vStream.time > 1.02*vStream.realTime || vStream.time < 0.98*vStream.realTime)) vStream.time = vStream.realTime;
 
 			// Pass frame data to renderer
-			renderFrame(buffer->frame, vStream.width, vStream.height);
+			if(!disableRenderer)  renderFrame(buffer->frame, vStream.width, vStream.height);
 
 			if (buffer->next == NULL) break;
 
@@ -293,7 +313,7 @@ int main(int argc, char *argv[]){
 	char* subfile = NULL;
 	char* flag;
 	int slowMode = 0;
-	int disableRenderer = 0;
+	disableRenderer = 0;
 
 	// Initialize our control structure
 	controls.pause = false;
@@ -313,8 +333,10 @@ int main(int argc, char *argv[]){
 	vStream.fpPos = 0;
 	vStream.subPos = 0;
 	vStream.fps = 0.0;
-	vStream.scale_x = 0;
-	vStream.scale_y = 0;
+	vStream.resized = false;
+	vStream.bufferEnd = false;
+	vStream.height = 240;
+	vStream.width = 480;
 
 	// Setup thread tracking
 	pthread_t threads[NUM_THREADS];
@@ -336,6 +358,8 @@ int main(int argc, char *argv[]){
 		}
 
 		if (!strcmp(flag, "--slow-mode")) slowMode = 1;
+
+		if(!strcmp(flag, "--no-limiter")) controls.fast_forward = true;
 
 		if (!strcmp(flag, "--no-render")) disableRenderer = 1;
 
@@ -365,6 +389,8 @@ int main(int argc, char *argv[]){
 		initscr();
 		noecho();
 		curs_set(FALSE);
+		//Get frame dimensions
+		updateFrameDimensions();
 	}
 
 	// Setup regex
@@ -377,6 +403,9 @@ int main(int argc, char *argv[]){
 	struct vStreamArgs *vArgs = (struct vStreamArgs*) malloc(sizeof(struct vStreamArgs*));
 	vArgs->file = filename;
 	vArgs->buffer = videoBuffer;
+
+	//Initialize ASCII converter
+	AsciiArtInit(&sRender);
 
 	// Create and track our threads
 	pthread_create(&threads[0], NULL, (void * (*)(void *))openStream, vArgs);

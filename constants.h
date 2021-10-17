@@ -1,8 +1,8 @@
 #ifndef CONSTANTS
 #define CONSTANTS
 
-#define ALIGNMENT 32
-#define MAX_BUFFER 100
+#define ALIGNMENT 16
+#define MAX_BUFFER 10
 #define MAX_CHAR 50
 #define NUM_ROWS 2
 #define NUM_THREADS 3
@@ -36,8 +36,8 @@ struct videoStream {
 	int scr_width;
 	int height;
 	int scr_height;
-	int scale_x;
-	int scale_y;
+	int vWidth;
+	int vHeight;
 	double time;
 	double realTime;
 	int frameCount;
@@ -48,6 +48,8 @@ struct videoStream {
 	int fpPos;
 	volatile int bufferLength;
 	volatile int semaphore;
+	volatile bool resized;
+	volatile bool bufferEnd;
 };
 
 struct vBuffer {
@@ -74,5 +76,8 @@ FILE* subFile;
 regex_t matchTime;
 int debug;
 int skew;
+int disableRenderer;
+
+ascii_render sRender;
 
 #endif
