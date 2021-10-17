@@ -1,15 +1,83 @@
 #include "renderer.h"
 
 void renderFrame(uint8_t *img, int width, int height) {
+	ascii_render sRender;
+
 	unsigned char *zText;
 	unsigned int nBytes;
 
-	updateFrameDimensions();
+	// Get rendering dimensions
+	int x = 0, y = 0;
+	getmaxyx(stdscr, y, x);
 
-	int scr_x = vStream.scr_width;
-	int scr_y = vStream.scr_height;
+	int scr_x = x, scr_y = y;
 
-	if (scr_x != vStream.scr_width || scr_y != vStream.scr_height) AsciiArtInit(&sRender);
+	// Update our scaling if needed
+	if(vStream.scr_width == 0 && vStream.scr_height == 0){
+		vStream.scr_width = width/CHAR_X;
+		vStream.scr_height = height/CHAR_Y;
+	}
+	
+	/*
+	if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+
+		// Clear buffer region
+		clear();
+
+		// Determine the minimum x scaling factor
+		int scale_x = 0;
+		while((width/CHAR_X) - scale_x > scr_x) scale_x++;
+
+		// Use nice whole integer scaling for now, not terribly robust sadly
+		while(scale_x != 0 && width%(scale_x*CHAR_X) != 0) scale_x++;
+		int scale_y = ceil(((double)height * (double)scale_x) / (double) width);
+
+		// This code is slightly better for scaling, however it is too complicated for me to figure out right now
+
+		// Determine the minimum y scaling factor
+		//int scale_y = 0;
+		//while((height/CHAR_Y) - scale_y > scr_y) scale_y++;
+
+		// Modify our scaling factors as needed to maintain aspect ratio
+		//while((double)scale_x/(double)scale_y > (double)vStream.width/(double)vStream.height) scale_y++;
+		//while((double)scale_y/(double)scale_x > (double)vStream.height/(double)vStream.width) scale_x++;
+
+		vStream.scale_x = scale_x;
+		vStream.scale_y = scale_y;
+	}
+	*/
+
+	if (scr_x != vStream.scr_width || scr_y != vStream.scr_height){
+		vStream.scr_width = scr_x;
+		vStream.scr_height = scr_y;
+
+		// Clear buffer region
+		clear();
+
+		int scale_x = 1;
+		while((scr_x*CHAR_X) < width/scale_x) scale_x++;
+
+		int scale_y = 1;
+		while((scr_y*CHAR_Y) < height/scale_y) scale_y++;
+
+		FILE *f = fopen("out.txt", "w");
+		fprintf(f, "%d %d\n", scale_x, scale_y);
+		fclose(f);
+
+		vStream.scale = scale_x > scale_y ? scale_x : scale_y;
+	}
+
+	//If scaling is needed call the scaler
+	if(vStream.scale > 1){
+		//resizeFrame(img, width, height);
+		betterScaler(img, width, height);
+	}
+
+	width = width/vStream.scale, height = height/vStream.scale;
+
+	AsciiArtInit(&sRender);
 
 	// Allocate space for ascii frame
 	nBytes = AsciiArtTextBufSize(&sRender, width, height);
@@ -25,8 +93,8 @@ void renderFrame(uint8_t *img, int width, int height) {
 	height = height/CHAR_Y;
 
 	// Determine our text offset to center the screen
-	int x = (scr_x-width)/2;
-	int y = (scr_y-height)/2+(scr_y-height)%2;
+	x = (x-width)/2;
+	y = (y-height)/2+(y-height)%2;
 
 	int newBytes = nBytes-height;
 	unsigned char stripped[newBytes];
@@ -59,8 +127,8 @@ void renderFrame(uint8_t *img, int width, int height) {
 			sprintf((char *)nextSubEnd, "Sub Ends: %f Sub File ptr: %d", *(vStream.subTimes+vStream.subPos*3+1), vStream.fpPos);
 			sprintf((char *)nextSubLine, "Sub Line: %f Array idx: %d", *(vStream.subTimes+vStream.subPos*3+2), vStream.subPos);
 		}
-		sprintf((char *)windowSize, "Width: %d Height: %d X: %d Y: %d", scr_x, scr_y, x, y);
-		sprintf((char *)rendererSize, "R_Width: %d R_Height: %d", width, height);
+		sprintf((char *)windowSize, "Width: %d Height: %d", scr_x, scr_y);
+		sprintf((char *)rendererSize, "R_Width: %d R_Height: %d Scale: %d", width, height, vStream.scale);
 		for (int i=0; i<newBytes; i++){
 			if(i%width < strlen((const char *)timecode) && i/width == 0) mvprintw(y, x, (const char *)timecode);
 			if(i%width < strlen((const char *)realtime) && i/width == 1) mvprintw(y+1, x, (const char *)realtime);
@@ -142,8 +210,8 @@ void generateSubs(char **frame){
 	if (vStream.time >= start && vStream.time < end){
 
 		// Total display width is a function of character size
-		int width = (vStream.width/CHAR_X);
-		int height = (vStream.height/CHAR_Y);
+		int width = (vStream.width/CHAR_X)/vStream.scale;
+		int height = (vStream.height/CHAR_Y)/vStream.scale;
 
 		// Calculate bounding box for our subtitles
 		int tBox_X = MAX_CHAR+2, tBox_Y = NUM_ROWS+2;
