@@ -2,7 +2,7 @@
 
 // Convert an AVFrame to a B/W image
 uint8_t* grayscale(AVFrame *pFrame, int width, int height){
-	uint8_t *img = (uint8_t*) malloc(width*height * sizeof(uint8_t*));
+	uint8_t *img = malloc(width*height * sizeof(uint8_t*));
 	uint8_t pixel[NUM_CHANNELS];
 
 	// Iterate over the frame buffer

@@ -78,7 +78,7 @@ void openStream(struct vStreamArgs* args){
 	uint8_t *buffer = NULL;
 
 	numBytes = av_image_get_buffer_size(AV_PIX_FMT_GRAY8, pCodecCtx->width, pCodecCtx->height, ALIGNMENT);
-	buffer = (uint8_t *)av_malloc(numBytes*sizeof(uint8_t));
+	buffer = av_malloc(numBytes*sizeof(uint8_t));
 
 	avpicture_fill((AVPicture *)pFrameRGB, buffer, AV_PIX_FMT_GRAY8, pCodecCtx->width, pCodecCtx->height);
 
@@ -156,7 +156,7 @@ void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
 	// Find the ned of the buffer
 	while ((*buffer)->next != NULL) (*buffer) = (*buffer)->next;
 	// Allocate the buffer
-	(*buffer)->next = (struct vBuffer*) malloc(sizeof(struct videoBuffer*)+sizeof(uint8_t*) * vStream.width*vStream.height);
+	(*buffer)->next = malloc(sizeof(struct videoBuffer*)+sizeof(uint8_t*) * vStream.width*vStream.height);
 	
 	// Handle the NULL head frame buffer
 	if (frame != NULL){
@@ -304,7 +304,7 @@ int main(int argc, char *argv[]){
 	wait.tv_nsec = 1000000;
 
 	// Initialize our video buffer
-	struct vBuffer *videoBuffer = (struct vBuffer*) malloc(sizeof(struct videoBuffer*));
+	struct vBuffer *videoBuffer = malloc(sizeof(struct videoBuffer*));
 	videoBuffer->frame = NULL;
 	videoBuffer->next = NULL;
 
@@ -378,7 +378,7 @@ int main(int argc, char *argv[]){
 	av_register_all();
 
 	// Prepare data for the stream
-	struct vStreamArgs *vArgs = (struct vStreamArgs*) malloc(sizeof(struct vStreamArgs*));
+	struct vStreamArgs *vArgs = malloc(sizeof(struct vStreamArgs*));
 	vArgs->file = filename;
 	vArgs->buffer = videoBuffer;
 
