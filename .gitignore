@@ -9,3 +9,4 @@ Lib/
 *.srt
 *.txt
 telnetflix
+temp/
