@@ -66,13 +66,13 @@ struct playback {
 	bool fast_forward;
 };
 
-struct videoStream vStream;
-struct timespec wait;
-struct playback controls;
+extern struct videoStream vStream;
+extern struct timespec wait;
+extern struct playback controls;
 
-FILE* subFile;
-regex_t matchTime;
-int debug;
-int skew;
+extern FILE* subFile;
+extern regex_t matchTime;
+extern int debug;
+extern int skew;
 
 #endif

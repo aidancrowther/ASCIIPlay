@@ -7,6 +7,15 @@
 
 #include "main.h"
 
+struct videoStream vStream;
+struct timespec wait;
+struct playback controls;
+
+FILE* subFile;
+regex_t matchTime;
+int debug;
+int skew;
+
 // Open up the file data stream and parse frames
 void openStream(struct vStreamArgs* args){
 
