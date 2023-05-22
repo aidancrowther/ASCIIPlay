@@ -1,7 +1,7 @@
 #include "ascii_art.h"
 #include <stdlib.h>
 
-void Ascsizeof(int) * img_width * img_heightiiArtInit(ascii_render *pRender) {
+void AsciiArtInit(ascii_render *pRender) {
 	pRender = malloc(sizeof(ascii_render));
 }
 
