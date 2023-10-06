@@ -65,8 +65,9 @@ struct vStreamArgs {
 };
 
 struct playback {
-	bool pause;
-	bool fast_forward;
+	atomic_bool pause;
+	atomic_bool fast_forward;
+	atomic_bool cease_execution;
 };
 
 extern struct videoStream vStream;
