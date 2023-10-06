@@ -138,6 +138,8 @@ void openStream(struct vStreamArgs* args){
 
 		// Free the packet we allocated
 		av_free_packet(&packet);
+
+		if (controls.cease_execution) break;
 	}
 	vStream.bufferEnd = true;
 
@@ -293,6 +295,8 @@ void *renderingEngine(struct vBuffer *buffer){
 		}
 
 		nanosleep(&wait, (struct timespec*) NULL);
+
+		if (controls.cease_execution) break;
 	}
 
 	// Close the subtitle file
@@ -313,8 +317,11 @@ int main(int argc, char *argv[]){
 	int disableRenderer = 0;
 
 	// Initialize our control structure
-	controls.pause = false;
-	controls.fast_forward = false;
+	controls = (struct playback) {
+		.pause = false,
+		.fast_forward = false,
+		.cease_execution = false
+	};
 
 	wait.tv_nsec = 1000000;
 

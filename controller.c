@@ -3,7 +3,7 @@
 void *inputHandler(){
 
     // Listen to user input for commands
-    while(1){
+    while(!controls.cease_execution){
 
         char input = getchar();
 
@@ -16,6 +16,10 @@ void *inputHandler(){
             case ('f'):
                 controls.fast_forward = !controls.fast_forward;
                 sleep(1);
+                break;
+
+            case (27):
+                controls.cease_execution = true;
                 break;
         }
     }
