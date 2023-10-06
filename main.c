@@ -32,12 +32,16 @@ void openStream(struct vStreamArgs* args){
 	int frameAdjustment = 0;
 
 	// Open video file
-	if(avformat_open_input(&pFormatCtx, filename, NULL, NULL) != 0)
+	if(avformat_open_input(&pFormatCtx, filename, NULL, NULL) != 0) {
+		vStream.bufferEnd = true; //use this to indicate to other threads that we failed
 		pthread_exit((void *)1); // Couldn't open file
+	}
 
 	//Get stream info
-	if(avformat_find_stream_info(pFormatCtx, NULL) < 0)
+	if(avformat_find_stream_info(pFormatCtx, NULL) < 0) {
+		vStream.bufferEnd = true; //use this to indicate to other threads that we failed
   		pthread_exit((void *)2); // Couldn't find stream information
+	}
 	
 	// Find first video stream
 	int i = 0;
@@ -131,11 +135,11 @@ void openStream(struct vStreamArgs* args){
 			}
 		}
 
-		vStream.bufferEnd = true;
 
 		// Free the packet we allocated
 		av_free_packet(&packet);
 	}
+	vStream.bufferEnd = true;
 
 	// Free the RGB image
 	av_free(buffer);
@@ -156,14 +160,11 @@ void openStream(struct vStreamArgs* args){
 
 // Write new frame data to the tail of the buffer queue
 void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
-	struct vBuffer *newBuffer;
+	// Wait for the mutex 
+	while (pthread_mutex_trylock(&vStream.mutex) != 0) nanosleep(&wait, (struct timespec*) NULL);;
 
-	// Wait for the semaphore
-	while (vStream.semaphore != 0) nanosleep(&wait, (struct timespec*) NULL);;
-	vStream.semaphore = 1;
-
-	// Find the ned of the buffer
-	while ((*buffer)->next != NULL) (*buffer) = (*buffer)->next;
+	// Find the end of the buffer
+	while ((*buffer)->next != NULL) { (*buffer) = (*buffer)->next; }
 	// Allocate the buffer
 	(*buffer)->next = malloc(sizeof(struct videoBuffer*)+sizeof(uint8_t*) * vStream.width*vStream.height);
 	
@@ -177,26 +178,28 @@ void writeBuffer(struct vBuffer **buffer, AVFrame *frame){
 	(*buffer)->next->next = NULL;
 	vStream.bufferLength++;
 
-	vStream.semaphore = 0;
+	pthread_mutex_unlock(&vStream.mutex);
 }
 
 // Return frame buffer at the head of our queue
 struct vBuffer* readBuffer(struct vBuffer **buffer){
 	struct vBuffer *nextBuffer;
 
-	// Wait for the semaphore so we don't cause any issues
-	while (vStream.semaphore != 0 || (vStream.bufferLength <= 2 && !vStream.bufferEnd)) nanosleep(&wait, (struct timespec*) NULL);;
-	vStream.semaphore = 1;
+	// don't bother trying to do anything if there's no need to do work
+	while ((vStream.bufferLength <= 2 && !vStream.bufferEnd)) nanosleep(&wait, (struct timespec*) NULL);;
+	// Wait for the mutex so we don't cause any issues
+	while (pthread_mutex_trylock(&vStream.mutex) != 0) nanosleep(&wait, (struct timespec*) NULL);
 
-	// Update buffer and queue
-	nextBuffer = (*buffer)->next;
-	free((*buffer)->frame);
-	free(*buffer);
-	vStream.bufferLength--;
-	vStream.semaphore = 0;
+	if ((*buffer)->next != NULL) {
+		// Update buffer and queue
+		nextBuffer = (*buffer)->next;
+		free((*buffer)->frame);
+		free(*buffer);
+		vStream.bufferLength--;
+	}
 
+	pthread_mutex_unlock(&vStream.mutex);
 	return &(*nextBuffer);
-
 }
 
 // Load array of subtitle time codes
@@ -258,7 +261,10 @@ void *renderingEngine(struct vBuffer *buffer){
 		while(controls.pause) sleep(0.1);
 
 		// Thread may be ready before the frames are, so wait for frames
-		while(vStream.bufferLength <= 0) nanosleep(&wait, (struct timespec*) NULL);
+		while(vStream.bufferLength <= 0) {
+			if (vStream.bufferEnd) pthread_exit((void*)1);
+			nanosleep(&wait, (struct timespec*) NULL);
+		}
 
 		if (frameDigits == 0) frameDigits = getNiceFramerate(vStream.srcFps);
 
@@ -282,7 +288,7 @@ void *renderingEngine(struct vBuffer *buffer){
 			// Pass frame data to renderer
 			renderFrame(buffer->frame, vStream.width, vStream.height);
 
-			if (buffer->next == NULL) break;
+			if ((buffer->next == NULL) && vStream.bufferEnd) break;
 
 		}
 
@@ -326,6 +332,7 @@ int main(int argc, char *argv[]){
 	vStream.fps = 0.0;
 	vStream.scale = 1;
 	vStream.bufferEnd = false;
+	pthread_mutex_init(&vStream.mutex, NULL);
 
 	// Setup thread tracking
 	pthread_t threads[NUM_THREADS];
@@ -403,6 +410,7 @@ int main(int argc, char *argv[]){
 	// Free allocated memory
 	free(vArgs);
 	if(vStream.subTimes != NULL) free(vStream.subTimes);
+	pthread_mutex_destroy(&vStream.mutex);
 
 	// Terminate our screen
 	endwin();
