@@ -16,6 +16,8 @@
 #define B 2
 
 #include "Lib/ascii_art.h"
+
+#include <stdatomic.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <libavcodec/avcodec.h>
@@ -28,6 +30,7 @@
 #include <stdio.h>
 #include <regex.h>
 #include <math.h>
+
 
 struct videoStream {
 	double fps;
@@ -45,9 +48,9 @@ struct videoStream {
 	char subs[2][MAX_CHAR];
 	int subPos;
 	int fpPos;
-	volatile int bufferLength;
-	volatile int semaphore;
-	volatile bool bufferEnd;
+	atomic_int bufferLength;
+	pthread_mutex_t mutex;
+	atomic_bool bufferEnd;
 };
 
 struct vBuffer {

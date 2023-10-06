@@ -115,4 +115,8 @@ but apparently you'll need some indeterminate number of these too:
 * python3-numpy
 * libtbb2
 * libtbb-dev
-* libdc1394-22-dev
+* libdc1394-dev
+
+```
+sudo apt install ffmpeg cmake make gcc build-essential pkg-config libgtk-2-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev gfortran openexr libatlas-base-dev python3-dev python3-numpy libtbb2 libtbb-dev libdc1394-dev
+```
