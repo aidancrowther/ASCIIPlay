@@ -156,7 +156,7 @@ void prepSubs(char *str){
 
 	// Strip newline and quotes
 	for(int i=0; i<MAX_CHAR; i++){
-		if (*(str+i) != '\n' && *(str+i) != '"') newString[iterator++] = *(str+i);
+		if (*(str+i) != '\n' && *(str+i) != '"' && *(str+i) != '\r') newString[iterator++] = *(str+i);
 	}
 
 	// Determine center offset
@@ -167,7 +167,7 @@ void prepSubs(char *str){
 	// Update string to centered and stripped text
 	for (int i=0; i<MAX_CHAR; i++){
 		*(str+i) = ' ';
-		if (i >= offset && i < offset+length && newString[iterator] != '\r') *(str+i) = newString[iterator++];
+		if (i >= offset && i < offset+length) *(str+i) = newString[iterator++];
 	}
 
 	// Declare the end of our string
