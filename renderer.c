@@ -167,7 +167,7 @@ void prepSubs(char *str){
 	// Update string to centered and stripped text
 	for (int i=0; i<MAX_CHAR; i++){
 		*(str+i) = ' ';
-		if (i >= offset-1 && i < offset+length-2) *(str+i) = newString[iterator++];
+		if (i >= offset && i < offset+length && newString[iterator] != '\r') *(str+i) = newString[iterator++];
 	}
 
 	// Declare the end of our string
